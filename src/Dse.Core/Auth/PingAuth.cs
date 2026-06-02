@@ -43,7 +43,7 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             new HttpDocumentRetriever { RequireHttps = true });
 
         options.TokenValidationParameters.ValidateIssuer = false;
-        options.TokenValidationParameters.ValidateAudience = true;
+        options.TokenValidationParameters.ValidateAudience = false;
         options.TokenValidationParameters.ValidateIssuerSigningKey = true;
         options.TokenValidationParameters.TransformBeforeSignatureValidation = (token, _) =>
         {
