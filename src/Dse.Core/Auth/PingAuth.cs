@@ -2,6 +2,8 @@
 
 
 using System.Diagnostics.CodeAnalysis;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +63,27 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
 
                 return Task.CompletedTask;
             },
+            OnAuthenticationFailed = ctx =>
+            {
+                var raw = ctx.Request.Headers.Authorization.ToString();
+                var tokenStr = raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? raw.Substring(7).Trim()
+                    : raw;
+
+                try
+                {
+                    var jwt = new JwtSecurityTokenHandler().ReadJwtToken(tokenStr);
+                    Console.WriteLine($"alg={jwt.Header.Alg} kid='{jwt.Header.Kid}' typ={jwt.Header.Typ}");
+                    Console.WriteLine($"raw header: {Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(jwt.RawHeader))}");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"parse failed: {e.Message}");
+                }
+
+                Console.WriteLine($"failure: {ctx.Exception}");
+                return Task.CompletedTask;
+            }
         };
     }
 
