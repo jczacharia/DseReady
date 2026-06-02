@@ -2,6 +2,7 @@
 
 
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +64,16 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
                 if (ctx.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
                 {
                     ctx.Token = cookieJwt;
+                }
+
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = ctx =>
+            {
+                if (ctx.Principal?.Identity is ClaimsIdentity identity
+                    && identity.FindFirst("uid")?.Value is { Length: > 0 } uid)
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
                 }
 
                 return Task.CompletedTask;
