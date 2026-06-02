@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Dse.Auth;
 
@@ -25,22 +28,35 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             return;
         }
 
-        options.Audience = "APP_DSE";
-        options.Authority = env switch
+        if (name != PingAuthDefaults.AuthenticationScheme)
         {
-            DseEnvironment.Rnd => "https://iam-idp-wf-rnd.pncint.net",
-            DseEnvironment.Uat => "https://iam-idp-wf-uat.pncint.net",
-            DseEnvironment.Qa => "https://wfsso-qa.pnc.com",
-            _ => "https://wfsso.pnc.com",
-        };
+            return;
+        }
+
+
+        // No Authority — there is no OIDC discovery doc for a PA web session.
+        options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            env switch
+            {
+                DseEnvironment.Rnd => "https://iam-idp-wf-rnd.pncint.net/pa/authtoken/JWKS",
+                DseEnvironment.Uat => "https://iam-idp-wf-uat.pncint.net/pa/authtoken/JWKS",
+                DseEnvironment.Qa => "https://wfsso-qa.pnc.com/pa/authtoken/JWKS",
+                _ => "https://wfsso.pnc.com/pa/authtoken/JWKS",
+            },
+            new JwksRetriever(),
+            new HttpDocumentRetriever { RequireHttps = true });
+
+        options.TokenValidationParameters.ValidIssuer = "PingAccess";
+        options.TokenValidationParameters.ValidAudience = "APP_DSE";
+        options.TokenValidationParameters.ValidateIssuerSigningKey = true;
 
         options.Events = new JwtBearerEvents
         {
-            OnMessageReceived = context =>
+            OnMessageReceived = ctx =>
             {
-                if (context.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
+                if (ctx.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } jwt)
                 {
-                    context.Token = cookieJwt;
+                    ctx.Token = jwt;
                 }
 
                 return Task.CompletedTask;
@@ -49,6 +65,27 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
     }
 
     public void Configure(JwtBearerOptions options) => Configure(PingAuthDefaults.AuthenticationScheme, options);
+}
+
+[ExcludeFromCodeCoverage]
+internal sealed class JwksRetriever : IConfigurationRetriever<OpenIdConnectConfiguration>
+{
+    public async Task<OpenIdConnectConfiguration> GetConfigurationAsync(
+        string address,
+        IDocumentRetriever retriever,
+        CancellationToken ct)
+    {
+        string? json = await retriever.GetDocumentAsync(address, ct);
+        var keys = new JsonWebKeySet(json);
+        var cfg = new OpenIdConnectConfiguration { Issuer = "PingAccess" };
+
+        foreach (SecurityKey? k in keys.GetSigningKeys())
+        {
+            cfg.SigningKeys.Add(k);
+        }
+
+        return cfg;
+    }
 }
 
 [ExcludeFromCodeCoverage]

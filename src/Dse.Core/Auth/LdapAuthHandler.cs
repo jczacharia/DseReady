@@ -14,7 +14,6 @@ public class LdapAuthHandler(
     IOptionsMonitor<LdapAuthOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    DseEnvironment env,
     IServiceProvider services)
     : AuthenticationHandler<LdapAuthOptions>(options, logger, encoder)
 {
