@@ -30,22 +30,17 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             return;
         }
 
-        if (name != PingAuthDefaults.AuthenticationScheme)
+        string metadataAddress = env switch
         {
-            return;
-        }
+            DseEnvironment.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
+            DseEnvironment.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
+            DseEnvironment.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
+            _ => "https://wfsso-apps.pnc.com/.well-known/openid-configuration",
+        };
 
-
-        // No Authority — there is no OIDC discovery doc for a PA web session.
         options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-            env switch
-            {
-                DseEnvironment.Rnd => "https://iam-idp-wf-rnd.pncint.net/pa/authtoken/JWKS",
-                DseEnvironment.Uat => "https://iam-idp-wf-uat.pncint.net/pa/authtoken/JWKS",
-                DseEnvironment.Qa => "https://wfsso-qa.pnc.com/pa/authtoken/JWKS",
-                _ => "https://wfsso.pnc.com/pa/authtoken/JWKS",
-            },
-            new JwksRetriever(),
+            metadataAddress,
+            new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever { RequireHttps = true });
 
         options.TokenValidationParameters.ValidIssuer = "PingAccess";
@@ -88,27 +83,6 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
     }
 
     public void Configure(JwtBearerOptions options) => Configure(PingAuthDefaults.AuthenticationScheme, options);
-}
-
-[ExcludeFromCodeCoverage]
-internal sealed class JwksRetriever : IConfigurationRetriever<OpenIdConnectConfiguration>
-{
-    public async Task<OpenIdConnectConfiguration> GetConfigurationAsync(
-        string address,
-        IDocumentRetriever retriever,
-        CancellationToken ct)
-    {
-        string? json = await retriever.GetDocumentAsync(address, ct);
-        var keys = new JsonWebKeySet(json);
-        var cfg = new OpenIdConnectConfiguration { Issuer = "PingAccess" };
-
-        foreach (SecurityKey? k in keys.GetSigningKeys())
-        {
-            cfg.SigningKeys.Add(k);
-        }
-
-        return cfg;
-    }
 }
 
 [ExcludeFromCodeCoverage]
