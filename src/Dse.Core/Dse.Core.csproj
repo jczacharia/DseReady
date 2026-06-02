@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Dse</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cronos" Version="0.13.0" />
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.19.21"/>
+    <PackageReference Include="Elastic.Ingest.Elasticsearch" Version="0.45.0"/>
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="Humanizer.Core" Version="3.0.10"/>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.27" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0"/>
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.84.1" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0"/>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageReference Include="Novell.Directory.Ldap.NETStandard" Version="4.0.0" />
+    <PackageReference Include="Thinktecture.Runtime.Extensions" Version="9.7.1"/>
+    <PackageReference Include="Thinktecture.Runtime.Extensions.Json" Version="9.7.1"/>
+    <PackageReference Include="UnitsNet" Version="5.75.0"/>
+  </ItemGroup>
+
+</Project>

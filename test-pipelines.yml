@@ -1,0 +1,97 @@
+variables:
+  - name: version
+    value: "2.0.0"
+  - name: mnemonic
+    value: dse
+  - name: app_name
+    value: searchapi
+  - name: sonar_project_key
+    value: "dse.searchapi"
+  - name: sonar_custom_exclusions
+    value: "*Tests*.cs,*testresult*.xml,*opencover*.xml,**/Program.cs,*Dockerfile*,**/quality_engineering/**"
+  - name: build_configuration
+    value: Release
+  - name: test_configuration
+    value: Release
+  - name: test_options
+    value: ""
+  - name: restore_proj
+    value: "**/*.sln"
+  - name: build_proj
+    value: "**/*.sln"
+  - name: nugetConfigPath
+    value: nuget.config
+
+trigger: none
+
+pool:
+  name: "PNC-Azure-Linux-Pipelines"
+
+resources:
+  containers:
+    - container: sdk
+      endpoint: enterprise_docker_stage_docker_pncint_net
+      image: pnc/jnk/microsoft/dotnet-8/core/sdk:1.0.13-8.6-1-0511260144-8.0-1-0511260143
+      options: -u root
+      env:
+        BROWSERSLIST_IGNORE_OLD_DATA: true
+        NODE_TLS_REJECT_UNAUTHORIZED: 0
+        DOTNET_ROLL_FORWARD: Major
+        HOME: /tmp
+
+container: sdk
+
+steps:
+  - task: SonarQubePrepare@8
+    displayName: "Prepare analysis on SonarQube"
+    inputs:
+      SonarQube: "enterprise_sonar"
+      projectKey: $(sonar_project_key)
+      projectVersion: $(version)
+      extraProperties: "sonar.scanner.skipJreProvisioning=true\
+        sonar.exclusions=**/*.bin\
+        sonar.scm.disabled=true\
+        sonar.coverage.dtdVerification=true \
+        sonar.exclusions=$(sonar_custom_exclusions)\
+        sonar.coverage.exclusions=\"*Tests*.cs, *testresult*.xml, *opencover*.xml\"\
+        sonar.test.exclusions=\"*Tests*.cs, *testresult*.xml, *opencover*.xml\"\
+        sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/**/coverage.opencover.xml\
+        sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/*.trx\
+        sonar.analysis.artifact=gav://pnc/$(mnemonic)/$(app_name):$(version)\
+        sonar.analysis.commit=$(Build.SourceVersion)\
+        "
+
+  - task: DotNetCoreCLI@2
+    displayName: "Restore"
+    inputs:
+      command: restore
+      projects: $(restore_proj)
+      configuration: $(build_configuration)
+      feedsToUse: config
+      nugetConfigPath: $(nugetConfigPath)
+      verbosityRestore: "Detailed"
+
+  - task: DotNetCoreCLI@2
+    displayName: "Build"
+    name: build
+    inputs:
+      command: build
+      projects: $(build_proj)
+      arguments: --configuration $(build_configuration) --no-restore
+
+  - task: DotNetCoreCLI@2
+    displayName: "Run Tests"
+    inputs:
+      command: test
+      projects: "**/*Tests.csproj"
+      arguments: --configuration $(test_configuration) $(test_options) --logger:Console;noprogress=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover --no-build --no-restore
+
+  - task: SonarQubeAnalyze@8
+    displayName: "Run Code Analysis"
+    inputs:
+      jdkversion: "JAVA_HOME_21_X64"
+
+  - task: SonarQubePublish@8
+    displayName: "Publish Quality Gate Result"
+    inputs:
+      pollingTimeoutSec: "300"

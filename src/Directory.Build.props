@@ -1,0 +1,29 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>Nullable</WarningsAsErrors>
+    <Features>strict</Features>
+    <UserSecretsId>dse</UserSecretsId>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Default</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <NuGetAudit>false</NuGetAudit>
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);Microsoft.AspNetCore.Http.Generated</InterceptorsPreviewNamespaces>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' != 'True'">
+    <InternalsVisibleTo Include="Dse.Tests"/>
+  </ItemGroup>
+
+</Project>

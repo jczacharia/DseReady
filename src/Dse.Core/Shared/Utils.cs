@@ -1,0 +1,18 @@
+// Copyright (c) PNC Financial Services. All rights reserved.
+
+
+using System.Text;
+
+namespace Dse.Shared;
+
+public static class Utils
+{
+    public static string EncodeBasicAuth(string username, string password)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        string credentials = $"{username}:{password}";
+        byte[] bytes = Encoding.UTF8.GetBytes(credentials);
+        return Convert.ToBase64String(bytes);
+    }
+}

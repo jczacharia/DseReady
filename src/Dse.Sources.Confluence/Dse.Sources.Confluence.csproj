@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dse.Core\Dse.Core.csproj" />
+  </ItemGroup>
+
+</Project>
