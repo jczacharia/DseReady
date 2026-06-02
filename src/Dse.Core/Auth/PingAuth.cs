@@ -3,14 +3,12 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Dse.Auth;
 
@@ -43,7 +41,6 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever { RequireHttps = true });
 
-        options.TokenValidationParameters.ValidIssuer = "PingAccess";
         options.TokenValidationParameters.ValidAudience = "APP_DSE";
         options.TokenValidationParameters.ValidateIssuerSigningKey = true;
 
@@ -51,34 +48,35 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
         {
             OnMessageReceived = ctx =>
             {
-                if (ctx.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } jwt)
+                string? outer = ctx.HttpContext.Request.Cookies["PA.APP_DSS"];
+                if (string.IsNullOrEmpty(outer))
                 {
-                    ctx.Token = jwt;
+                    string authHeader = ctx.HttpContext.Request.Headers.Authorization.ToString();
+                    if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        outer = authHeader["Bearer ".Length..].Trim();
+                    }
+                }
+
+                if (string.IsNullOrEmpty(outer))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var handler = new JwtSecurityTokenHandler();
+                if (!handler.CanReadToken(outer))
+                {
+                    return Task.CompletedTask;
+                }
+
+                string? inner = handler.ReadJwtToken(outer).Payload.GetValueOrDefault("access_token") as string;
+                if (!string.IsNullOrEmpty(inner))
+                {
+                    ctx.Token = inner;
                 }
 
                 return Task.CompletedTask;
             },
-            OnAuthenticationFailed = ctx =>
-            {
-                var raw = ctx.Request.Headers.Authorization.ToString();
-                var tokenStr = raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                    ? raw.Substring(7).Trim()
-                    : raw;
-
-                try
-                {
-                    var jwt = new JwtSecurityTokenHandler().ReadJwtToken(tokenStr);
-                    Console.WriteLine($"alg={jwt.Header.Alg} kid='{jwt.Header.Kid}' typ={jwt.Header.Typ}");
-                    Console.WriteLine($"raw header: {Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(jwt.RawHeader))}");
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"parse failed: {e.Message}");
-                }
-
-                Console.WriteLine($"failure: {ctx.Exception}");
-                return Task.CompletedTask;
-            }
         };
     }
 
