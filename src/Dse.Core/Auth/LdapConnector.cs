@@ -83,7 +83,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
 
         await foreach (LdapEntry entry in results.ConfigureAwait(false))
         {
-            if (entry.Get(Options.GroupsAttribute) is { } attr)
+            if (entry.GetOrDefault(Options.GroupsAttribute) is { } attr)
             {
                 foreach (string dn in attr.StringValueArray)
                 {

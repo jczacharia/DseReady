@@ -4,6 +4,7 @@
 using Dse.Auth;
 using Dse.Shared;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
 
 namespace Dse.Runtime;
@@ -41,12 +42,24 @@ internal sealed class Program
         // builder.Services.AddHostedService<SourcesValidator>();
 
         builder.Services
-            .AddAuthentication(builder.Environment.IsDevelopment() ? "Dev" : PingAuthDefaults.AuthenticationScheme)
+            .AddAuthentication(PingAuthDefaults.AuthenticationScheme)
             .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("Dev", null)
             .AddPingAuth()
             .AddLdapAuth();
 
-        builder.Services.AddAuthorizationBuilder();
+        builder.Services.AddAuthorization(auth =>
+        {
+            var policyBuilder = new AuthorizationPolicyBuilder().RequireAuthenticatedUser();
+
+            if (builder.Environment.IsDevelopment())
+            {
+                policyBuilder.AddAuthenticationSchemes("Dev");
+            }
+
+            auth.DefaultPolicy = policyBuilder.AddAuthenticationSchemes(
+                    PingAuthDefaults.AuthenticationScheme, LdapDefaults.Ad, LdapDefaults.Oud)
+                .Build();
+        });
 
         builder.Services
             .AddEndpointsApiExplorer()

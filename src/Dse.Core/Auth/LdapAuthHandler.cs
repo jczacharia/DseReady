@@ -20,22 +20,12 @@ public class LdapAuthHandler(
 {
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        string? uid = null;
-        if (env is DseEnvironment.Dev devEnv)
+        if (Context.User.IsAnonymous() || Context.User.FindFirstValue(ClaimTypes.NameIdentifier) is not { Length: > 0 } uid)
         {
-            uid = devEnv.Username;
-        }
-        else if (await Context.AuthenticateAsync(PingAuthDefaults.AuthenticationScheme) is { Succeeded: true } pingResult)
-        {
-            uid = pingResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            return AuthenticateResult.NoResult();
         }
 
-        if (string.IsNullOrEmpty(uid))
-        {
-            return AuthenticateResult.Fail("No user identifier resolved.");
-        }
-
-        var identity = new ClaimsIdentity(Scheme.Name);
+        var identity = new ClaimsIdentity(); // Authentication type intentionally null
         var connector = services.GetRequiredKeyedService<LdapConnector>(Scheme.Name);
 
         foreach (string membership in await connector.GetMembershipsAsync(uid))

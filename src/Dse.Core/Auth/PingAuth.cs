@@ -34,14 +34,17 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             _ => "https://wfsso.pnc.com",
         };
 
-        options.Events.OnMessageReceived = context =>
+        options.Events = new JwtBearerEvents
         {
-            if (context.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
+            OnMessageReceived = context =>
             {
-                context.Token = cookieJwt;
-            }
+                if (context.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
+                {
+                    context.Token = cookieJwt;
+                }
 
-            return Task.CompletedTask;
+                return Task.CompletedTask;
+            },
         };
     }
 
