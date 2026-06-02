@@ -41,25 +41,16 @@ internal sealed class Program
         // builder.Services.AddSourceModule<ConfluenceModule>();
         // builder.Services.AddHostedService<SourcesValidator>();
 
+        builder.Services.AddLdapAd();
+        builder.Services.AddLdapOud();
+
         builder.Services
-            .AddAuthentication(PingAuthDefaults.AuthenticationScheme)
-            .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("Dev", null)
-            .AddPingAuth()
-            .AddLdapAuth();
+            .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
+            .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", null)
+            .AddPingAuthentication();
 
-        builder.Services.AddAuthorization(auth =>
-        {
-            var policyBuilder = new AuthorizationPolicyBuilder().RequireAuthenticatedUser();
-
-            if (builder.Environment.IsDevelopment())
-            {
-                policyBuilder.AddAuthenticationSchemes("Dev");
-            }
-
-            auth.DefaultPolicy = policyBuilder.AddAuthenticationSchemes(
-                    PingAuthDefaults.AuthenticationScheme, LdapDefaults.Ad, LdapDefaults.Oud)
-                .Build();
-        });
+        builder.Services.AddAuthorizationBuilder()
+            .SetDefaultPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
         builder.Services
             .AddEndpointsApiExplorer()
@@ -86,9 +77,10 @@ internal sealed class Program
         api.MapDseHealthChecks();
 
         app.UseAuthentication();
+        app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         app.UseAuthorization();
-        api.MapEndpoints().RequireAuthorization();
 
+        api.MapEndpoints();
         await app.RunAsync().ConfigureAwait(false);
     }
 }

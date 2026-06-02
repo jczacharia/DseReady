@@ -15,4 +15,14 @@ public static class Utils
         byte[] bytes = Encoding.UTF8.GetBytes(credentials);
         return Convert.ToBase64String(bytes);
     }
+
+    public static string IfEmpty(this string? source, string defaultValue)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return defaultValue;
+        }
+
+        return source;
+    }
 }

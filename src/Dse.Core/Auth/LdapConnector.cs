@@ -17,6 +17,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private LdapConnection? _connection;
     private LdapAuthOptions Options => _monitor.Get(name);
+    public string Name => name;
 
     public void Dispose()
     {

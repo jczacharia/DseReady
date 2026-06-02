@@ -87,7 +87,7 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
 [ExcludeFromCodeCoverage]
 public static class PingAuthOptionsExtensions
 {
-    public static AuthenticationBuilder AddPingAuth(this AuthenticationBuilder builder)
+    public static AuthenticationBuilder AddPingAuthentication(this AuthenticationBuilder builder)
     {
         builder.AddJwtBearer(PingAuthDefaults.AuthenticationScheme);
         builder.Services.ConfigureOptions<ConfigurePingJwtBearerOptions>();
