@@ -2,11 +2,11 @@
 
 
 using System.Diagnostics.CodeAnalysis;
-using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -41,38 +41,28 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
             new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever { RequireHttps = true });
 
-        options.TokenValidationParameters.ValidAudience = "APP_DSE";
+        options.TokenValidationParameters.ValidateIssuer = false;
+        options.TokenValidationParameters.ValidateAudience = true;
         options.TokenValidationParameters.ValidateIssuerSigningKey = true;
+        options.TokenValidationParameters.TransformBeforeSignatureValidation = (token, _) =>
+        {
+            if (token is JsonWebToken outer
+                && outer.TryGetPayloadValue<string>("access_token", out string? inner)
+                && !string.IsNullOrEmpty(inner))
+            {
+                return new JsonWebToken(inner);
+            }
+
+            return token;
+        };
 
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
             {
-                string? outer = ctx.HttpContext.Request.Cookies["PA.APP_DSS"];
-                if (string.IsNullOrEmpty(outer))
+                if (ctx.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
                 {
-                    string authHeader = ctx.HttpContext.Request.Headers.Authorization.ToString();
-                    if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                    {
-                        outer = authHeader["Bearer ".Length..].Trim();
-                    }
-                }
-
-                if (string.IsNullOrEmpty(outer))
-                {
-                    return Task.CompletedTask;
-                }
-
-                var handler = new JwtSecurityTokenHandler();
-                if (!handler.CanReadToken(outer))
-                {
-                    return Task.CompletedTask;
-                }
-
-                string? inner = handler.ReadJwtToken(outer).Payload.GetValueOrDefault("access_token") as string;
-                if (!string.IsNullOrEmpty(inner))
-                {
-                    ctx.Token = inner;
+                    ctx.Token = cookieJwt;
                 }
 
                 return Task.CompletedTask;
