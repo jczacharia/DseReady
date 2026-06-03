@@ -17,7 +17,7 @@ public sealed class ConfluenceOptions
     /// <summary>
     ///     Confluence caps at 50 content search endpoint when body is requested so do not go over this limit.
     /// </summary>
-    [Range(1, 50)]
+    [Range(minimum: 1, maximum: 50)]
     public int PageSize { get; set; } = 50;
 
     public int InboundBufferMaxSize { get; set; } = 5000;

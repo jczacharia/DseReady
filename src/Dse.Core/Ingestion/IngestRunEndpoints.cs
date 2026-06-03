@@ -21,7 +21,7 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
     {
         RouteGroupBuilder group = builder.MapGroup("sources");
 
-        foreach (var module in sourceModules)
+        foreach (SourceModule module in sourceModules)
         {
             SourceKey sourceKey = module.SourceKey;
 
@@ -30,7 +30,7 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
                     HttpContext context,
                     CancellationToken ct) =>
                 {
-                    IngestRun run = IngestRun.Create(sourceKey, dryRun: false);
+                    var run = IngestRun.Create(sourceKey, dryRun: false);
                     outbox.DbContext.IngestRuns.Add(run);
 
                     await outbox.PublishAsync(new IngestRunCreated(run.Id));
@@ -46,7 +46,7 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
                     HttpContext context,
                     CancellationToken ct) =>
                 {
-                    IngestRun run = IngestRun.Create(sourceKey, dryRun: true);
+                    var run = IngestRun.Create(sourceKey, dryRun: true);
                     outbox.DbContext.IngestRuns.Add(run);
 
                     await outbox.PublishAsync(new IngestRunCreated(run.Id));

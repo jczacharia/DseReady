@@ -43,9 +43,9 @@ public static class EntityExtensions
         string routeName,
         object? routeValues) where TEntity : IEntity<TKey> where TKey : notnull
     {
-        LinkGenerator linkGenerator = httpContext.RequestServices.GetRequiredService<LinkGenerator>();
+        var linkGenerator = httpContext.RequestServices.GetRequiredService<LinkGenerator>();
         string? location = linkGenerator.GetUriByName(httpContext, routeName, routeValues);
-        Uri uri = new Uri(location ?? throw new NotSupportedException($"Could not create URI for endpoint '{routeName}'"));
+        var uri = new Uri(location ?? throw new NotSupportedException($"Could not create URI for endpoint '{routeName}'"));
         return TypedResults.AcceptedAtRoute(new EntityResponse<TKey>(entity.Id, uri), routeName, routeValues);
     }
 }

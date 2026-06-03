@@ -6,6 +6,7 @@ using Dse.Data;
 using Dse.ES;
 using Dse.Messaging;
 using Dse.Shared;
+using Dse.Sources;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
@@ -36,6 +37,8 @@ public static class ServiceDefaultsExtensions
         builder.Services.AddElastic();
         builder.AddData();
         builder.AddMessaging();
+
+        builder.Services.AddSourceInitializers();
 
         builder.Services.AddProblemDetails(static s => s.ApplyCoreCustomization());
         builder.Services.ConfigureHttpClientDefaults(static o => o.RemoveAllLoggers());
@@ -110,10 +113,8 @@ public static class ServiceDefaultsExtensions
         }
     }
 
-    private static void AddDefaultHealthChecks(this IHostApplicationBuilder builder)
-    {
+    private static void AddDefaultHealthChecks(this IHostApplicationBuilder builder) =>
         builder.Services.AddHealthChecks().AddCheck("self", static () => HealthCheckResult.Healthy(), ["live"]);
-    }
 
     public static RouteGroupBuilder MapDefaultEndpoints(this IEndpointRouteBuilder routeBuilder)
     {

@@ -39,8 +39,10 @@ internal sealed class Program
     private static async Task<int> MainCore(string[] args)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
         builder.AddServiceDefaults();
+
+        builder.Services.AddSourceModule<ConfluenceModule>();
+
         builder.Services.AddEndpoints([typeof(Program).Assembly]);
         builder.Services.AddSignalR(e =>
         {
@@ -58,6 +60,7 @@ internal sealed class Program
                 {
                     options.IncludeXmlComments(xmlPath);
                 }
+
                 options.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Version = "v1",
@@ -67,9 +70,6 @@ internal sealed class Program
             })
             .AddThinktectureOpenApiFilters();
 
-        builder.Services.AddSourceModule<ConfluenceModule>();
-        builder.Services.AddHostedService<SourcesValidator>();
-
         if (builder.Environment.EnvironmentName != "Test")
         {
             builder.Services.AddLdapAd();
@@ -77,7 +77,7 @@ internal sealed class Program
 
             builder.Services
                 .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
-                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", null)
+                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", configureOptions: null)
                 .AddPingAuthentication();
         }
 

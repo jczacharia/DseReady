@@ -23,7 +23,7 @@ public sealed class ElasticStartupService(
     private const long DefaultBulkMaxByteSize = 100L * 1024 * 1024;
 
     private static readonly ElasticStartupData s_fallbackData =
-        new(Math.Max(2, Environment.ProcessorCount), DefaultBulkMaxByteSize, 0);
+        new(Math.Max(val1: 2, Environment.ProcessorCount), DefaultBulkMaxByteSize, DataNodeCount: 0);
 
     private volatile ElasticStartupData _data = s_fallbackData;
 
@@ -33,7 +33,7 @@ public sealed class ElasticStartupService(
     {
         if (env is DseEnv.Test)
         {
-            _data = new ElasticStartupData(15, DefaultBulkMaxByteSize, 2);
+            _data = new ElasticStartupData(MaxChannelConcurrency: 15, DefaultBulkMaxByteSize, DataNodeCount: 2);
             return;
         }
 
@@ -54,7 +54,7 @@ public sealed class ElasticStartupService(
 
     private async Task<ElasticStartupData> ProbeClusterAsync(CancellationToken ct)
     {
-        NodesInfoResponse response = await client.Nodes.InfoAsync(null, Metrics.All, ct);
+        NodesInfoResponse response = await client.Nodes.InfoAsync(nodeId: null, Metrics.All, ct);
         if (!response.IsValidResponse)
         {
             throw new InvalidOperationException($"Nodes info failed: {response.DebugInformation}");
@@ -102,8 +102,8 @@ public sealed class ElasticStartupService(
         double nodeUtilization = cfg.GetValue<double?>("DSE_NODE_UTILIZATION") ?? 0.75;
         double clientOversubscription = cfg.GetValue<double?>("DSE_CLIENT_OVERSUBSCRIPTION") ?? 2.0;
 
-        int clusterCeiling = Math.Max(2, (int)(writePoolCapacity * nodeUtilization));
-        int clientCeiling = Math.Max(2, (int)(Environment.ProcessorCount * clientOversubscription));
+        int clusterCeiling = Math.Max(val1: 2, (int)(writePoolCapacity * nodeUtilization));
+        int clientCeiling = Math.Max(val1: 2, (int)(Environment.ProcessorCount * clientOversubscription));
 
         int maxChannelConcurrency = Math.Min(clusterCeiling, clientCeiling);
 

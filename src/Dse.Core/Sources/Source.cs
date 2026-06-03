@@ -3,6 +3,9 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
+using Dse.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Thinktecture;
 
 namespace Dse.Sources;
@@ -39,4 +42,32 @@ public sealed partial class SourceKey
                 new ValidationError("Invalid SourceKey. Must be 1-30 chars, lowercase alphanumeric, and start with a letter.");
         }
     }
+}
+
+public sealed class Source : IEntity<SourceKey>
+{
+    public required string AssemblyQualifiedName { get; init; }
+    public required SourceKey Id { get; init; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+    public SourceModule GetModule() => Type.GetType(AssemblyQualifiedName)!.GetAssemblySourceModule();
+
+    public static Source FromType(Type type)
+    {
+        SourceModule module = type.GetAssemblySourceModule();
+        return new Source
+        {
+            Id = module.SourceKey,
+            AssemblyQualifiedName =
+                module.GetType().AssemblyQualifiedName ??
+                throw new InvalidOperationException($"AssemblyQualifiedName is null for type {module.GetType()}"),
+        };
+    }
+
+    public static Source FromModule(SourceModule module) => FromType(module.GetType());
+}
+
+internal sealed class SourceConfiguration : IEntityTypeConfiguration<Source>
+{
+    public void Configure(EntityTypeBuilder<Source> builder) => builder.ToTable(nameof(Source));
 }

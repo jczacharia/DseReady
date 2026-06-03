@@ -15,21 +15,20 @@ using UnitsNet;
 namespace Dse.Ingestion;
 
 [ExcludeFromCodeCoverage]
-public readonly record struct IngestReportSnapshot(
-    SourceKey SourceKey,
-    long TotalToProduce,
-    TimeSpan Elapsed,
-    double PercentComplete,
-    double DocsPerSecond,
-    TimeSpan EstimatedRemaining,
-    long Produced,
-    long ManagedMemoryBytes,
-    long WorkingMemoryBytes,
-    DateTimeOffset Timestamp)
+public sealed class IngestReportSnapshot
 {
+    public required long TotalToProduce { get; init; }
+    public required TimeSpan Elapsed { get; init; }
+    public required double PercentComplete { get; init; }
+    public required double DocsPerSecond { get; init; }
+    public required TimeSpan EstimatedRemaining { get; init; }
+    public required long Produced { get; init; }
+    public required long ManagedMemoryBytes { get; init; }
+    public required long WorkingMemoryBytes { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+
     public string PrettyPrint() =>
         $"""
-         [{SourceKey}]
          completion:  {PercentComplete:0.00}%
          elapsed:     {Elapsed.Humanize(2)}
          remaining:   {EstimatedRemaining.Humanize(2)}
@@ -53,14 +52,16 @@ public readonly record struct IngestReportSnapshot(
 [JsonDerivedType(typeof(Faulted), "faulted")]
 [JsonDerivedType(typeof(Canceled), "canceled")]
 [Union]
-public abstract partial record IngestRunProgress : IEntity<Guid>
+public abstract partial class IngestRunProgress : IEntity<Guid>
 {
+    public IngestRun IngestRun { get; init; } = null!;
+    public Guid IngestRunId { get; init; }
+
+    public bool IsTerminal => this is Succeeded or Failed or Faulted or Canceled;
+    public IngestReportSnapshot? SnapshotOrNull => this is IWithSnapshot s ? s.Snapshot : null;
     public Guid Id { get; init; } = Guid.NewGuid();
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
-
-    public IngestRun IngestRun { get; init; }
-    public Guid IngestRunId { get; init; }
 
     /// <summary>Marker for variants that carry a mid-run snapshot.</summary>
     public interface IWithSnapshot
@@ -69,44 +70,66 @@ public abstract partial record IngestRunProgress : IEntity<Guid>
     }
 
     // ── Lifecycle markers — past tense ("this just happened") ──
-    public sealed record Queued : IngestRunProgress;
+    public sealed class Queued : IngestRunProgress;
 
-    public sealed record Started(bool DryRun) : IngestRunProgress;
+    public sealed class Started : IngestRunProgress
+    {
+        public required bool DryRun { get; init; }
+    }
 
-    public sealed record Bootstrapped(
-        string IndexName,
-        int BatchExportSize,
-        int DrainSize,
-        int MaxConcurrency) : IngestRunProgress;
+    public sealed class Bootstrapped : IngestRunProgress
+    {
+        public required string IndexName { get; init; }
+        public required int BatchExportSize { get; init; }
+        public required int DrainSize { get; init; }
+        public required int MaxConcurrency { get; init; }
+    }
 
-    public sealed record TotalMeasured(long Total) : IngestRunProgress;
+    public sealed class TotalMeasured : IngestRunProgress
+    {
+        public required long Total { get; init; }
+    }
 
     // ── Mid-phase ticks — gerund ("currently in phase X; here's the latest snapshot") ──
-    public sealed record Ingesting(IngestReportSnapshot Snapshot) : IngestRunProgress, IWithSnapshot;
+    public sealed class Ingesting : IngestRunProgress, IWithSnapshot
+    {
+        public required IngestReportSnapshot Snapshot { get; init; }
+    }
 
-    public sealed record Draining(IngestReportSnapshot Snapshot) : IngestRunProgress, IWithSnapshot;
+    public sealed class Draining : IngestRunProgress, IWithSnapshot
+    {
+        public required IngestReportSnapshot Snapshot { get; init; }
+    }
 
-    public sealed record Aliasing(IngestReportSnapshot Snapshot) : IngestRunProgress, IWithSnapshot;
+    public sealed class Aliasing : IngestRunProgress, IWithSnapshot
+    {
+        public required IngestReportSnapshot Snapshot { get; init; }
+    }
 
     // ── Terminal states — past tense ──
-    public sealed record Succeeded(IngestReportSnapshot Snapshot) : IngestRunProgress, IWithSnapshot;
+    public sealed class Succeeded : IngestRunProgress, IWithSnapshot
+    {
+        public required IngestReportSnapshot Snapshot { get; init; }
+    }
 
-    public sealed record Failed(string Reason) : IngestRunProgress;
+    public sealed class Failed : IngestRunProgress
+    {
+        public required string Reason { get; init; }
+    }
 
     /// <summary>
     ///     Deserialization path: the primary ctor parameters must bind to <see cref="Exception" />,
     ///     otherwise System.Text.Json cannot round-trip this state and any stream consumer breaks on an error.
     /// </summary>
-    [method: JsonConstructor]
-    public sealed record Faulted(ExceptionDto Exception) : IngestRunProgress
+    public sealed class Faulted : IngestRunProgress
     {
-        public Faulted(Exception ex) : this(ExceptionDto.From(ex)) { }
+        public required ExceptionDto Exception { get; init; }
     }
 
-    public sealed record Canceled(string Reason) : IngestRunProgress;
-
-    public bool IsTerminal => this is Succeeded or Failed or Faulted or Canceled;
-    public IngestReportSnapshot? SnapshotOrNull => this is IWithSnapshot s ? s.Snapshot : null;
+    public sealed class Canceled : IngestRunProgress
+    {
+        public required string Reason { get; init; }
+    }
 }
 
 internal sealed class IngestRunProgressConfiguration :
@@ -123,6 +146,32 @@ internal sealed class IngestRunProgressConfiguration :
     IEntityTypeConfiguration<IngestRunProgress.Faulted>,
     IEntityTypeConfiguration<IngestRunProgress.Canceled>
 {
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Aliasing> builder)
+    {
+        ConfigureSnapshot(builder);
+    }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Bootstrapped> builder) { }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Canceled> builder) { }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Draining> builder)
+    {
+        ConfigureSnapshot(builder);
+    }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Failed> builder) { }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Faulted> builder)
+    {
+        builder.ComplexProperty(p => p.Exception);
+    }
+
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Ingesting> builder)
+    {
+        ConfigureSnapshot(builder);
+    }
+
     public void Configure(EntityTypeBuilder<IngestRunProgress> builder)
     {
         builder.ToTable(nameof(IngestRunProgress));
@@ -152,21 +201,15 @@ internal sealed class IngestRunProgressConfiguration :
 
     public void Configure(EntityTypeBuilder<IngestRunProgress.Started> builder) { }
 
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Bootstrapped> builder) { }
+    public void Configure(EntityTypeBuilder<IngestRunProgress.Succeeded> builder)
+    {
+        ConfigureSnapshot(builder);
+    }
 
     public void Configure(EntityTypeBuilder<IngestRunProgress.TotalMeasured> builder) { }
 
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Ingesting> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Draining> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Aliasing> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Succeeded> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Failed> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Faulted> builder) { }
-
-    public void Configure(EntityTypeBuilder<IngestRunProgress.Canceled> builder) { }
+    public static void ConfigureSnapshot<T>(EntityTypeBuilder<T> builder) where T : class, IngestRunProgress.IWithSnapshot
+    {
+        builder.ComplexProperty(b => b.Snapshot);
+    }
 }

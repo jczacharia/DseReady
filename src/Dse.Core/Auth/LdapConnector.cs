@@ -14,7 +14,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();
     private readonly DseEnv _env = services.GetRequiredService<DseEnv>();
     private readonly IOptionsMonitor<LdapAuthOptions> _monitor = services.GetRequiredService<IOptionsMonitor<LdapAuthOptions>>();
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly SemaphoreSlim _semaphore = new(initialCount: 1, maxCount: 1);
     private LdapConnection? _connection;
     private LdapAuthOptions Options => _monitor.Get(name);
     public string Name => name;
@@ -77,7 +77,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
                 LdapConnection.ScopeSub,
                 Options.GroupsFilter?.Invoke(EscapeFilter(uid)),
                 [Options.GroupsAttribute],
-                false)
+                typesOnly: false)
             .ConfigureAwait(false);
 
         HashSet<string> set = new(StringComparer.OrdinalIgnoreCase);

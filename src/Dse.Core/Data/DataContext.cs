@@ -2,6 +2,7 @@
 
 
 using Dse.Ingestion;
+using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Thinktecture;
@@ -10,8 +11,8 @@ namespace Dse.Data;
 
 public sealed class DataContext(DbContextOptions<DataContext> options) : DbContext(options)
 {
+    public DbSet<Source> Sources { get; init; }
     public DbSet<IngestRun> IngestRuns { get; init; }
-
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using Dse.Shared;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Dse.Messaging;

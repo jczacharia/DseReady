@@ -2,6 +2,7 @@
 
 
 using System.Diagnostics;
+using Dse.Data;
 using Dse.Runtime;
 using Dse.Shared;
 using Dse.Tests;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 
 [assembly: CaptureConsole(CaptureError = true, CaptureOut = true)]
 [assembly: AssemblyFixture(typeof(TestFixture))]
@@ -80,7 +82,7 @@ public sealed class TestFixture : IAsyncLifetime
                 services.RunWolverineInSoloMode();
                 services
                     .AddAuthentication("Test")
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", null);
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
             });
         }, new TestConfigurationExtension(builder =>
         {
@@ -92,6 +94,8 @@ public sealed class TestFixture : IAsyncLifetime
         {
             context.Request.EnableBuffering();
         });
+
+        await Host.ResetAllDataAsync<DataContext>(Ct);
     }
 
     public async ValueTask DisposeAsync()
@@ -125,7 +129,7 @@ public sealed class TestFixture : IAsyncLifetime
 
     public async Task TearDownAsync(IServiceProvider services)
     {
-        await Host.ResetResourceState(Ct);
+        await Host.ResetAllDataAsync<DataContext>(Ct);
 
         // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
         // We don't add it add all so behavior is the same.
