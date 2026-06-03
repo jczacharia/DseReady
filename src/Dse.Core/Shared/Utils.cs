@@ -16,7 +16,7 @@ public static class Utils
         return Convert.ToBase64String(bytes);
     }
 
-    public static string IfEmpty(this string? source, string defaultValue)
+    public static string Or(this string? source, string defaultValue)
     {
         if (string.IsNullOrWhiteSpace(source))
         {

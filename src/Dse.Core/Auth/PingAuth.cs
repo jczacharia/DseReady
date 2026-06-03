@@ -20,7 +20,7 @@ public static class PingAuthDefaults
 }
 
 [ExcludeFromCodeCoverage]
-internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNamedOptions<JwtBearerOptions>
+internal class ConfigurePingJwtBearerOptions(DseEnv env) : IConfigureNamedOptions<JwtBearerOptions>
 {
     public void Configure(string? name, JwtBearerOptions options)
     {
@@ -31,9 +31,9 @@ internal class ConfigurePingJwtBearerOptions(DseEnvironment env) : IConfigureNam
 
         string metadataAddress = env switch
         {
-            DseEnvironment.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
-            DseEnvironment.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
-            DseEnvironment.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
+            DseEnv.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
+            DseEnv.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
+            DseEnv.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
             _ => "https://wfsso-apps.pnc.com/.well-known/openid-configuration",
         };
 

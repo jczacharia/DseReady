@@ -11,20 +11,19 @@ namespace Dse.Auth;
 
 public sealed class DevAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
-    DseEnvironment dseEnv,
+    DseEnv dseEnv,
     ILoggerFactory logger,
-    UrlEncoder encoder)
-    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (dseEnv is not DseEnvironment.Dev devEnv)
+        if (dseEnv is not { LocalCredentials.Username: { } username })
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
         ClaimsIdentity identity = new();
-        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, devEnv.Username));
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, username));
         ClaimsPrincipal principal = new(identity);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }

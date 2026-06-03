@@ -3,6 +3,9 @@
 
 using Dse.Auth;
 using Dse.Shared;
+using Dse.Sources;
+using Dse.Sources.Confluence;
+using JasperFx;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
@@ -13,11 +16,11 @@ namespace Dse.Runtime;
 internal sealed class Program
 #pragma warning restore S1118
 {
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         try
         {
-            await MainAsync(args).ConfigureAwait(false);
+            return await MainCore(args).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -32,22 +35,26 @@ internal sealed class Program
         }
     }
 
-    private static async Task MainAsync(string[] args)
+    private static async Task<int> MainCore(string[] args)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         builder.AddServiceDefaults();
+        builder.Services.AddEndpoints([typeof(Program).Assembly]);
 
-        // builder.Services.AddSourceModule<ConfluenceModule>();
-        // builder.Services.AddHostedService<SourcesValidator>();
+        builder.Services.AddSourceModule<ConfluenceModule>();
+        builder.Services.AddHostedService<SourcesValidator>();
 
-        builder.Services.AddLdapAd();
-        builder.Services.AddLdapOud();
+        if (builder.Environment.EnvironmentName != "Test")
+        {
+            builder.Services.AddLdapAd();
+            builder.Services.AddLdapOud();
 
-        builder.Services
-            .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
-            .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", null)
-            .AddPingAuthentication();
+            builder.Services
+                .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
+                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", null)
+                .AddPingAuthentication();
+        }
 
         builder.Services.AddAuthorizationBuilder()
             .SetDefaultPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
@@ -57,6 +64,7 @@ internal sealed class Program
             .AddSwaggerGen(options => options.SwaggerDoc("v1", new OpenApiInfo { Title = "DSE", Version = "v1" }));
 
         WebApplication app = builder.Build();
+        app.UsePathBase("/api");
 
         if (app.Environment.IsProduction())
         {
@@ -73,14 +81,13 @@ internal sealed class Program
         app.UseStatusCodePages();
         app.UseOutputCache();
 
-        RouteGroupBuilder api = app.MapGroup("api");
-        api.MapDseHealthChecks();
+        app.MapDseHealthChecks();
 
         app.UseAuthentication();
         app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         app.UseAuthorization();
 
-        api.MapEndpoints();
-        await app.RunAsync().ConfigureAwait(false);
+        app.MapEndpoints();
+        return await app.RunJasperFxCommands(args);
     }
 }

@@ -12,7 +12,7 @@ namespace Dse.Auth;
 public sealed class LdapConnector(string name, IServiceProvider services) : IDisposable
 {
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();
-    private readonly DseEnvironment _env = services.GetRequiredService<DseEnvironment>();
+    private readonly DseEnv _env = services.GetRequiredService<DseEnv>();
     private readonly IOptionsMonitor<LdapAuthOptions> _monitor = services.GetRequiredService<IOptionsMonitor<LdapAuthOptions>>();
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private LdapConnection? _connection;
