@@ -531,3 +531,5 @@ Thumbs.db
 .local-es/
 
 global.json
+
+*.db

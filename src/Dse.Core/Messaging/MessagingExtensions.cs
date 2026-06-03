@@ -6,6 +6,7 @@ using Dse.Data;
 using Dse.Shared;
 using Humanizer;
 using JasperFx;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Wolverine;
@@ -43,6 +44,13 @@ public static class MessagingExtensions
             opts.Policies
                 .OnException<ConcurrencyException>()
                 .RetryTimes(3)
+                .Then
+                .MoveToErrorQueue();
+
+            opts.Policies
+                .OnException<SqliteException>()
+                .Or<TimeoutException>()
+                .RetryWithCooldown(50.Milliseconds(), 100.Milliseconds(), 250.Milliseconds())
                 .Then
                 .MoveToErrorQueue();
 

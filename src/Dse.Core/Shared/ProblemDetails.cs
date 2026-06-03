@@ -13,6 +13,8 @@ namespace Dse.Shared;
 
 public static class ProblemDetailsExtensions
 {
+    public const string HttpContextKey = "SetProblemDetails";
+
     private static string BuildExceptionChainMessage(Exception ex)
     {
         StringBuilder message = new($"{ex.GetType().Name}: {ex.Message} {ex.StackTrace}");
@@ -26,11 +28,11 @@ public static class ProblemDetailsExtensions
 
     public static void ApplyCoreCustomization(this ProblemDetailsOptions setup) => setup.CustomizeProblemDetails = context =>
     {
-        if (context.HttpContext.Items["OverridenProblemDetails"] is ProblemDetails overridenProblemDetails)
+        if (context.HttpContext.Items[HttpContextKey] is ProblemDetails setProblem)
         {
-            context.ProblemDetails = overridenProblemDetails;
+            context.ProblemDetails = setProblem;
 
-            if (overridenProblemDetails.Status is { } status && !context.HttpContext.Response.HasStarted)
+            if (setProblem.Status is { } status && !context.HttpContext.Response.HasStarted)
             {
                 context.HttpContext.Response.StatusCode = status;
             }
@@ -71,6 +73,15 @@ public static class ProblemDetailsExtensions
             context.ProblemDetails.Detail = "The requested resource was not found.";
         }
     };
+
+    public static void SetProblem(this HttpContext httpContext, HttpStatusCode statusCode, string title, string detail) =>
+        httpContext.Items[HttpContextKey] = new ProblemDetails
+        {
+            Instance = httpContext.Request.Path,
+            Title = title,
+            Detail = detail,
+            Status = (int)statusCode,
+        };
 
 
     public static ProblemHttpResult ProblemHttpResult(

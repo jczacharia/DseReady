@@ -29,7 +29,6 @@ public sealed class TestFixture : IAsyncLifetime
     private const string ElasticVersion = "8.19.14";
     private const int ElasticPort = 9200;
 
-    private const string SqlLiteConnectionString = "Data Source=dse.db";
     private static readonly TimeSpan s_readinessTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
@@ -38,7 +37,7 @@ public sealed class TestFixture : IAsyncLifetime
 
     private Process? _process;
     public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
-    protected CancellationToken Ct => TestContext.Current.CancellationToken;
+    private CancellationToken Ct => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
     {
@@ -87,10 +86,6 @@ public sealed class TestFixture : IAsyncLifetime
         {
             builder.AddUserSecrets("dse");
             builder.AddConfiguration(config.Build());
-            builder.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:sqlite"] = SqlLiteConnectionString,
-            });
         }));
 
         _host.BeforeEach(context =>

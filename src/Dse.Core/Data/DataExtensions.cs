@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using Dse.Shared;
 using Gridify;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -15,8 +16,7 @@ namespace Dse.Data;
 public static class DataExtensions
 {
     public static string GetSqliteConnectionString(this IConfiguration configuration) =>
-        configuration.GetConnectionString("sqlite")
-        ?? throw new InvalidOperationException("Connection string 'sqlite' not found.");
+        configuration.GetConnectionString("sqlite").Or("Data Source=dse.db");
 
     public static string GetSqliteConnectionString(this IServiceProvider services) =>
         services.GetRequiredService<IConfiguration>().GetSqliteConnectionString();

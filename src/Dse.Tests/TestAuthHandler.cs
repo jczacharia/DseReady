@@ -15,17 +15,20 @@ public sealed class TestAuthHandler(
     UrlEncoder encoder
 ) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
+    public const string TestUid = "TestUid";
+    public const string TestRoles = "TestRoles";
+
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Context.Items.ContainsKey("TestUid") || Context.Items["TestUid"] is not string uid)
+        if (!Context.Items.ContainsKey(TestUid) || Context.Items[TestUid] is not string uid)
         {
             return Task.FromResult(AuthenticateResult.Fail("UserTenant not found in HttpContext.Items"));
         }
 
-        var identity = new ClaimsIdentity(Scheme.Name);
+        ClaimsIdentity identity = new(Scheme.Name);
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
 
-        if (Context.Items.ContainsKey("TestRoles") && Context.Items["TestRoles"] is string[] roles)
+        if (Context.Items.ContainsKey(TestRoles) && Context.Items[TestRoles] is string[] roles)
         {
             identity.AddClaims(roles.Select(role => new Claim(ClaimTypes.Role, role)));
         }

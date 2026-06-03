@@ -8,6 +8,7 @@ using Dse.Messaging;
 using Dse.Shared;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -54,6 +55,7 @@ public static class ServiceDefaultsExtensions
 
         if (builder is WebApplicationBuilder app)
         {
+            app.WebHost.UseKestrel(o => o.AddServerHeader = false); // Security best practice
             app.Host.UseDefaultServiceProvider(static options =>
             {
                 options.ValidateScopes = true;
@@ -110,15 +112,12 @@ public static class ServiceDefaultsExtensions
 
     private static void AddDefaultHealthChecks(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddOutputCache(static t => t.AddPolicy("HealthChecks", static p => p.Expire(TimeSpan.FromSeconds(10))));
-
         builder.Services.AddHealthChecks().AddCheck("self", static () => HealthCheckResult.Healthy(), ["live"]);
     }
 
-    public static RouteGroupBuilder MapDseHealthChecks(this IEndpointRouteBuilder routeBuilder)
+    public static RouteGroupBuilder MapDefaultEndpoints(this IEndpointRouteBuilder routeBuilder)
     {
-        RouteGroupBuilder healthChecks = routeBuilder.MapGroup("").AllowAnonymous();
-        healthChecks.CacheOutput("HealthChecks");
+        RouteGroupBuilder healthChecks = routeBuilder.MapGroup("");
 
         healthChecks.MapHealthChecks("/live", new HealthCheckOptions
         {
@@ -141,9 +140,8 @@ public static class ServiceDefaultsExtensions
             ResponseWriter = WriteHealthReport,
         });
 
-        HealthCheckServiceOptions registry =
-            routeBuilder.ServiceProvider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
-        foreach (string name in registry.Registrations.Select(reg => reg.Name))
+        var healthOpts = routeBuilder.ServiceProvider.GetRequiredService<IOptions<HealthCheckServiceOptions>>();
+        foreach (string name in healthOpts.Value.Registrations.Select(r => r.Name))
         {
             healthChecks.MapHealthChecks($"/health/{name}", new HealthCheckOptions
             {

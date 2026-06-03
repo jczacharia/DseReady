@@ -8,7 +8,8 @@ using Dse.Sources.Confluence;
 using JasperFx;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
+using Thinktecture.Swashbuckle;
 
 namespace Dse.Runtime;
 
@@ -41,6 +42,30 @@ internal sealed class Program
 
         builder.AddServiceDefaults();
         builder.Services.AddEndpoints([typeof(Program).Assembly]);
+        builder.Services.AddSignalR(e =>
+        {
+            if (!builder.Environment.IsProduction())
+            {
+                e.EnableDetailedErrors = true;
+            }
+        });
+
+        builder.Services
+            .AddEndpointsApiExplorer()
+            .AddSwaggerGen(options =>
+            {
+                foreach (string xmlPath in Directory.EnumerateFiles(AppContext.BaseDirectory, "Dse.*.xml"))
+                {
+                    options.IncludeXmlComments(xmlPath);
+                }
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "DSE",
+                    Description = "Enterprise Search",
+                });
+            })
+            .AddThinktectureOpenApiFilters();
 
         builder.Services.AddSourceModule<ConfluenceModule>();
         builder.Services.AddHostedService<SourcesValidator>();
@@ -56,15 +81,11 @@ internal sealed class Program
                 .AddPingAuthentication();
         }
 
-        builder.Services.AddAuthorizationBuilder()
+        builder.Services
+            .AddAuthorizationBuilder()
             .SetDefaultPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
-        builder.Services
-            .AddEndpointsApiExplorer()
-            .AddSwaggerGen(options => options.SwaggerDoc("v1", new OpenApiInfo { Title = "DSE", Version = "v1" }));
-
         WebApplication app = builder.Build();
-        app.UsePathBase("/api");
 
         if (app.Environment.IsProduction())
         {
@@ -73,21 +94,34 @@ internal sealed class Program
 
         // Skip HTTPS redirect in-container: OpenShift Routes do edge TLS termination,
         // so the pod listens plain HTTP on 8080. A redirect here would 307 every probe.
+        if (!builder.Environment.IsProduction())
+        {
+            app.UseHttpsRedirection();
+        }
+
+        RouteGroupBuilder api = app.MapGroup("");
 
         app.UseSwagger();
-        app.UseSwaggerUI();
+        app.UseStaticFiles();
+        app.UseSwaggerUI(c =>
+        {
+            c.DocumentTitle = "DSE OpenAPI | Enterprise Search";
+            c.SwaggerEndpoint("/swagger.json", "v1");
+            c.RoutePrefix = string.Empty;
+            c.EnableDeepLinking();
+            c.DisplayOperationId();
+        });
 
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseOutputCache();
 
-        app.MapDseHealthChecks();
+        api.MapDefaultEndpoints().AllowAnonymous();
 
         app.UseAuthentication();
         app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         app.UseAuthorization();
 
-        app.MapEndpoints();
+        api.MapEndpoints().RequireAuthorization();
         return await app.RunJasperFxCommands(args);
     }
 }

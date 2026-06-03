@@ -3,6 +3,8 @@
 
 using System.Diagnostics;
 using AwesomeAssertions;
+using Dse.Sources;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Wolverine;
 using Wolverine.Runtime;
@@ -13,7 +15,9 @@ namespace Dse.Tests;
 public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsyncLifetime
 {
     private IAlbaHost Host => fixture.Host;
-    private AsyncServiceScope TestScope { get; set; }
+    private AsyncServiceScope? TestScope { get; set; }
+    protected IServiceProvider Services => TestScope.HasValue ? TestScope.Value.ServiceProvider : Host.Services;
+    protected SourceModule[] Sources => Host.Services.GetServices<SourceModule>().ToArray();
 
     protected ITestOutputHelper Out => toh;
     protected WolverineRuntime Runtime => (WolverineRuntime)Host.Services.GetRequiredService<IWolverineRuntime>();
@@ -29,12 +33,10 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
 
     public async ValueTask DisposeAsync()
     {
-        await fixture.TearDownAsync(TestScope.ServiceProvider);
-        await TestScope.DisposeAsync();
+        await fixture.TearDownAsync(Services);
+        await (TestScope?.DisposeAsync() ?? ValueTask.CompletedTask);
         GC.SuppressFinalize(this);
     }
-
-    protected T Inject<T>() where T : notnull => TestScope.ServiceProvider.GetRequiredService<T>();
 
     protected AlbaHostExtensions.ResponseExpression ResponseExpression(Action<Scenario> configure) => new(Host, configure);
 
@@ -58,7 +60,18 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
         return response;
     }
 
-    protected async Task<(ITrackedSession Tracked, IScenarioResult Http)> TrackedScenario(Action<Scenario> configure)
+    protected async Task<ProblemDetails> Problem(Action<Scenario> configure, Action<ProblemDetails>? assert = null)
+    {
+        IScenarioResult result = await Scenario(configure);
+        var response = await result.ReadAsJsonAsync<ProblemDetails>();
+        response.Should().BeAssignableTo<ProblemDetails>();
+        assert?.Invoke(response);
+        return response;
+    }
+
+    protected async Task<(ITrackedSession Tracked, IScenarioResult Http)> TrackedScenario(
+        Action<Scenario> configure,
+        Action<ITrackedSession, IScenarioResult>? assert = null)
     {
         IScenarioResult http = null!;
         ITrackedSession tracked = await Host.TrackActivity()
@@ -66,10 +79,14 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
             .IgnoreMessagesMatchingType(IsInfrastructureMessage)
             .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async _ => http = await Host.Scenario(configure)));
         Out.WriteLine(await http.ReadAsTextAsync());
+        assert?.Invoke(tracked, http);
         return (tracked, http);
     }
 
     private static bool IsInfrastructureMessage(Type t) =>
         t.Namespace is { } ns && (ns.StartsWith("Wolverine.", StringComparison.Ordinal) ||
                                   ns.StartsWith("JasperFx.", StringComparison.Ordinal));
+
+    protected Task ForEachSourceAsync(Func<SourceModule, Task> task) => Assert.MultipleAsync(
+        Sources.Select(module => (Func<Task>)(() => task(module))).ToArray());
 }

@@ -24,6 +24,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
     <PackageReference Include="Thinktecture.Runtime.Extensions" Version="9.7.1"/>
+    <PackageReference Include="Thinktecture.Runtime.Extensions.EntityFrameworkCore9" Version="9.7.1" />
     <PackageReference Include="Thinktecture.Runtime.Extensions.Json" Version="9.7.1"/>
     <PackageReference Include="UnitsNet" Version="5.75.0"/>
     <PackageReference Include="Weasel.Sqlite" Version="8.15.2" />
