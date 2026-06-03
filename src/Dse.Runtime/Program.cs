@@ -88,6 +88,11 @@ internal sealed class Program
         WebApplication app = builder.Build();
         app.UsePathBase("/api");
 
+        // Exception handling must come early so it can catch failures from every middleware below it —
+        // HTTPS redirect, Swagger, auth, the LDAP enrichment middleware, and the routed endpoints.
+        app.UseExceptionHandler();
+        app.UseStatusCodePages();
+
         if (app.Environment.IsProduction())
         {
             app.UseHsts();
@@ -100,10 +105,8 @@ internal sealed class Program
             app.UseHttpsRedirection();
         }
 
-        RouteGroupBuilder api = app.MapGroup("");
-
-        app.UseSwagger(o => o.RouteTemplate = "swagger/{documentName}/swagger.json");
         app.UseStaticFiles();
+        app.UseSwagger(o => o.RouteTemplate = "swagger/{documentName}/swagger.json");
         app.UseSwaggerUI(c =>
         {
             c.DocumentTitle = "DSE OpenAPI | Enterprise Search";
@@ -113,16 +116,13 @@ internal sealed class Program
             c.DisplayOperationId();
         });
 
-        app.UseExceptionHandler();
-        app.UseStatusCodePages();
-
-        api.MapDefaultEndpoints().AllowAnonymous();
+        app.MapDefaultEndpoints().AllowAnonymous();
 
         app.UseAuthentication();
         app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         app.UseAuthorization();
 
-        api.MapEndpoints().RequireAuthorization();
+        app.MapEndpoints().RequireAuthorization();
         return await app.RunJasperFxCommands(args);
     }
 }
