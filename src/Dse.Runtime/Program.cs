@@ -141,6 +141,12 @@ internal sealed class Program
         }
 
         app.UseStaticFiles();
+
+        // Hardcoded override for the OpenAPI `servers` URL. Set OpenApi__ExternalBaseUrl in the deployment
+        // env (e.g. "https://search-rnd.pncint.net/adv/api") as a safety net when the apache change that
+        // sets X-Forwarded-Prefix hasn't shipped yet, OR to pin an absolute URL regardless of headers.
+        string? configuredExternalBase = app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/');
+
         app.UseSwagger(o =>
         {
             o.RouteTemplate = "swagger/{documentName}/swagger.json";
@@ -151,10 +157,11 @@ internal sealed class Program
             // X-Forwarded-Prefix (apache must `RequestHeader set X-Forwarded-Prefix "/adv"`), so the
             // emitted server URL is the real external base in every environment.
             o.PreSerializeFilters.Add((document, httpReq) =>
-                document.Servers =
-                [
-                    new OpenApiServer { Url = $"{httpReq.Scheme}://{httpReq.Host.Value}{httpReq.PathBase}" },
-                ]);
+            {
+                string url = configuredExternalBase
+                             ?? $"{httpReq.Scheme}://{httpReq.Host.Value}{httpReq.PathBase}";
+                document.Servers = [new OpenApiServer { Url = url }];
+            });
         });
         app.UseSwaggerUI(c =>
         {
