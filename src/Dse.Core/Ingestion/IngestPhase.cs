@@ -3,10 +3,6 @@
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Coarse-grained phase of an <see cref="IngestRun" />.
-///     The full transition log lives in <see cref="IngestRunEvent" />.
-/// </summary>
 public enum IngestPhase
 {
     Queued = 0,

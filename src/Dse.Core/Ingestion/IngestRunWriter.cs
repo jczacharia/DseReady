@@ -7,23 +7,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Appends a state-transition event for an <see cref="IngestRun" /> and updates the flat summary fields
-///     on the aggregate in the same change-tracker pass. The caller is responsible for committing
-///     (typically <c>SaveChangesAndFlushMessagesAsync</c> via the Wolverine outbox).
-/// </summary>
+/// <summary>Appends an event and projects it onto the flat <see cref="IngestRun" /> summary.</summary>
 public static class IngestRunWriter
 {
-    /// <summary>
-    ///     Append <paramref name="payload" /> to the event log for <paramref name="run" /> and apply its
-    ///     side effects to the flat <see cref="IngestRun" /> summary.
-    /// </summary>
     /// <remarks>
-    ///     <see cref="IngestRunEvent.Seq" /> is computed as <c>MAX(Seq) + 1</c> over existing rows for the run.
-    ///     Per-run sequencing is correct under SQLite's single-writer model and under any future provider as
-    ///     long as concurrent transitions for the same run are serialized — today that's a single endpoint
-    ///     request; once a real progress handler chain exists, partition the Wolverine local queue by
-    ///     <see cref="Entity.Id" /> so events for one run land on a single worker.
+    ///     Seq is MAX+1 per run. Concurrent writers for the same run must be serialized — partition the
+    ///     Wolverine queue by RunId once a real handler chain exists.
     /// </remarks>
     public static async Task<IngestRunEvent> AppendAsync(
         this DataContext db,
@@ -49,7 +38,6 @@ public static class IngestRunWriter
         return evt;
     }
 
-    /// <summary>Project a payload onto the flat <see cref="IngestRun" /> summary.</summary>
     private static void Apply(this IngestRun run, IngestEventPayload payload, DateTimeOffset at)
     {
         switch (payload)

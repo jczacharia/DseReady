@@ -8,11 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Entry point for an ingestion run. Loads the freshly-created <see cref="IngestRun" />, resolves the
-///     source-specific <see cref="IIngestRunner" /> by <see cref="IngestRun.SourceKey" />, and runs it.
-///     Each phase transition persists an <see cref="IngestRunEvent" /> and broadcasts a live update.
-/// </summary>
+/// <summary>Dispatches an <see cref="IngestRunCreated" /> to the source-specific <see cref="IIngestRunner" />.</summary>
 public sealed class IngestRunCreatedHandler
 {
     public static async Task Handle(

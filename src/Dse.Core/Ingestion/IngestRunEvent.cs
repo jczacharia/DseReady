@@ -8,11 +8,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Append-only event log row. One row per state transition for a given <see cref="IngestRun" />.
-///     <see cref="Seq" /> is monotonically increasing per <see cref="RunId" />; <see cref="Payload" /> is the
-///     JSON-serialized <see cref="IngestEventPayload" /> for that transition.
-/// </summary>
+/// <summary>Append-only transition log; one row per phase change. <see cref="Seq" /> is monotonic per <see cref="RunId" />.</summary>
 public sealed class IngestRunEvent : Entity
 {
     public Guid RunId { get; init; }
@@ -42,9 +38,6 @@ public sealed class IngestRunEventConfiguration : IEntityTypeConfiguration<Inges
 
         builder.Property(e => e.Type).HasMaxLength(64);
 
-        // nvarchar(max) on SQL Server (planned prod), TEXT on SQLite today. Keep it untyped and let the
-        // provider pick its native large-string column type. If/when payload querying becomes a real need on
-        // SQL Server, switch to native json (SQL Server 2025+) or expose JSON_VALUE computed columns.
         builder.Property(e => e.Payload);
 
         builder.HasIndex(e => new { e.RunId, e.Seq }).IsUnique();

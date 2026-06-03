@@ -10,11 +10,7 @@ using UnitsNet;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Typed payload carried inside an <see cref="IngestRunEvent.Payload" /> JSON column.
-///     One concrete record per transition. The <c>"$type"</c> discriminator is preserved across the
-///     wire so SignalR / HTTP stream consumers can pattern-match on the concrete shape.
-/// </summary>
+/// <summary>Typed payload of an <see cref="IngestRunEvent" />.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(Queued), "queued")]
 [JsonDerivedType(typeof(Started), "started")]
@@ -48,15 +44,11 @@ public abstract record IngestEventPayload
 
     public sealed record Failed(string Reason) : IngestEventPayload;
 
-    /// <summary>
-    ///     Deserialization path: the primary ctor parameters must bind to <see cref="ExceptionDto" />,
-    ///     otherwise System.Text.Json cannot round-trip this state and any stream consumer breaks on an error.
-    /// </summary>
+    /// <summary>Ctor param must be <see cref="ExceptionDto" /> so STJ can round-trip the error state.</summary>
     public sealed record Faulted(ExceptionDto Exception) : IngestEventPayload;
 
     public sealed record Canceled(string Reason) : IngestEventPayload;
 
-    /// <summary>Marker for variants that carry a mid-run snapshot.</summary>
     public interface IWithSnapshot
     {
         IngestReportSnapshot Snapshot { get; }

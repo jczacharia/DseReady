@@ -8,10 +8,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Flat aggregate carrying the current state of an ingestion run.
-///     History lives in <see cref="IngestRunEvent" />; this type is the read-optimized summary.
-/// </summary>
+/// <summary>Flat summary; history lives in <see cref="IngestRunEvent" />.</summary>
 public sealed class IngestRun : Entity
 {
     private IngestRun() { }
