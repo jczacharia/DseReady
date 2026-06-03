@@ -13,6 +13,7 @@ public sealed class DataContext(DbContextOptions<DataContext> options) : DbConte
 {
     public DbSet<Source> Sources { get; init; }
     public DbSet<IngestRun> IngestRuns { get; init; }
+    public DbSet<IngestRunEvent> IngestRunEvents { get; init; }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

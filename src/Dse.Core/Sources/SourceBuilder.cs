@@ -1,10 +1,12 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using Dse.Ingestion;
 using Dse.Shared;
 using Elastic.Ingest.Elasticsearch.Strategies;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Dse.Sources;
@@ -40,14 +42,19 @@ public sealed class SourceBuilder
     public IServiceCollection Services { get; }
     public SourceKey SourceKey => _module.SourceKey;
 
-    // public void AddIngestion<TDoc, TIngest>()
-    //     where TDoc : class
-    //     where TIngest : class, IIngest<TDoc>
-    // {
-    //     Services.TryAddSingleton<IngestStatusTracker>();
-    //     Services.AddScoped<IIngest<TDoc>, TIngest>();
-    //     Services.AddKeyedScoped<IIngestRunner, IngestRunner<TDoc>>(SourceKey);
-    // }
+    /// <summary>
+    ///     Register the source's ingest pipeline. Adds the broadcaster once (idempotent), binds
+    ///     <see cref="IIngest{TDoc}" /> to the supplied implementation, and registers a keyed
+    ///     <see cref="IIngestRunner" /> the dispatcher resolves by <see cref="SourceKey" />.
+    /// </summary>
+    public void AddIngestion<TDoc, TIngest>()
+        where TDoc : class
+        where TIngest : class, IIngest<TDoc>
+    {
+        Services.TryAddSingleton<IngestProgressBroadcaster>();
+        Services.AddScoped<IIngest<TDoc>, TIngest>();
+        Services.AddKeyedScoped<IIngestRunner, IngestRunner<TDoc>>(SourceKey);
+    }
 
     public void AddIngestStrategy<TDoc, TIngest>()
         where TDoc : class

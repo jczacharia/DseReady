@@ -86,6 +86,7 @@ internal sealed class Program
             .SetDefaultPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
         WebApplication app = builder.Build();
+        app.UsePathBase("/api");
 
         if (app.Environment.IsProduction())
         {
@@ -101,13 +102,13 @@ internal sealed class Program
 
         RouteGroupBuilder api = app.MapGroup("");
 
-        app.UseSwagger();
+        app.UseSwagger(o => o.RouteTemplate = "swagger/{documentName}/swagger.json");
         app.UseStaticFiles();
         app.UseSwaggerUI(c =>
         {
             c.DocumentTitle = "DSE OpenAPI | Enterprise Search";
-            c.SwaggerEndpoint("/swagger.json", "v1");
-            c.RoutePrefix = string.Empty;
+            c.SwaggerEndpoint("v1/swagger.json", "v1");
+            c.RoutePrefix = "swagger";
             c.EnableDeepLinking();
             c.DisplayOperationId();
         });

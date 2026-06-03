@@ -27,6 +27,6 @@ public class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) : TestBe
             s.Post.Url($"/sources/{module.SourceKey}/ingest/full");
             s.WithUser([DseEntitlements.KibanaAdminOudDn]);
             s.StatusCodeShouldBe(HttpStatusCode.Accepted);
-        }, (tracked, _) => tracked.FindEnvelopesWithMessageType<IngestRunCreated>().Should().ContainSingle())
+        }, (tracked, _) => tracked.FindSingleTrackedMessageOfType<IngestRunCreated>().Should().NotBeNull())
     ));
 }

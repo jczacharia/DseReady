@@ -15,6 +15,9 @@ using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Ingestion;
 
+/// <summary>Read DTO for an <see cref="IngestRunEvent" /> row — payload is the typed polymorphic record.</summary>
+public sealed record IngestRunEventDto(long Seq, DateTimeOffset At, IngestEventPayload Payload);
+
 public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) : IEndpoint
 {
     public void MapEndpoint(IEndpointRouteBuilder builder)
@@ -32,6 +35,7 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
                 {
                     var run = IngestRun.Create(sourceKey, dryRun: false);
                     outbox.DbContext.IngestRuns.Add(run);
+                    await outbox.DbContext.AppendAsync(run, new IngestEventPayload.Queued(), ct);
 
                     await outbox.PublishAsync(new IngestRunCreated(run.Id));
                     await outbox.SaveChangesAndFlushMessagesAsync(ct);
@@ -48,6 +52,7 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
                 {
                     var run = IngestRun.Create(sourceKey, dryRun: true);
                     outbox.DbContext.IngestRuns.Add(run);
+                    await outbox.DbContext.AppendAsync(run, new IngestEventPayload.Queued(), ct);
 
                     await outbox.PublishAsync(new IngestRunCreated(run.Id));
                     await outbox.SaveChangesAndFlushMessagesAsync(ct);
@@ -72,6 +77,32 @@ public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) 
                     return TypedResults.Ok(run);
                 })
                 .WithName($"{sourceKey}-GetIngestRun")
+                .RequireAuthorization(p => p.RequireKibanaReadonlyEntitlement());
+
+            group.MapGet($"{sourceKey}/ingest/{{runId:guid}}/events",
+                    async Task<Results<ProblemHttpResult, Ok<IReadOnlyList<IngestRunEventDto>>>> (
+                        Guid runId,
+                        HttpContext context,
+                        IDbContextOutbox<DataContext> outbox,
+                        CancellationToken ct) =>
+                    {
+                        if (!await outbox.DbContext.IngestRuns.AnyAsync(r => r.Id == runId, ct))
+                        {
+                            return context.ProblemHttpResult(HttpStatusCode.NotFound,
+                                "Not Found", $"IngestRun with id {runId} not found");
+                        }
+
+                        List<IngestRunEvent> rows = await outbox.DbContext.IngestRunEvents
+                            .Where(e => e.RunId == runId)
+                            .OrderBy(e => e.Seq)
+                            .ToListAsync(ct);
+
+                        IReadOnlyList<IngestRunEventDto> dtos = rows
+                            .ConvertAll(e => new IngestRunEventDto(e.Seq, e.At, e.Deserialize()));
+
+                        return TypedResults.Ok(dtos);
+                    })
+                .WithName($"{sourceKey}-GetIngestRunEvents")
                 .RequireAuthorization(p => p.RequireKibanaReadonlyEntitlement());
         }
     }
