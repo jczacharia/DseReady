@@ -15,7 +15,6 @@ using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Ingestion;
 
-/// <summary>Read DTO for an <see cref="IngestRunEvent" /> row — payload is the typed polymorphic record.</summary>
 public sealed record IngestRunEventDto(long Seq, DateTimeOffset At, IngestEventPayload Payload);
 
 public sealed class IngestRunEndpoints(IEnumerable<SourceModule> sourceModules) : IEndpoint

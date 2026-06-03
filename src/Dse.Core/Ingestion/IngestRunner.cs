@@ -16,11 +16,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Dse.Ingestion;
 
-/// <summary>
-///     Source-specific runner: instantiates an <see cref="IngestChannel{TDoc}" />, drives the
-///     <see cref="IIngest{TDoc}" /> pipeline, and translates each phase into an
-///     <see cref="IngestEventPayload" /> persisted via <see cref="IngestRunWriter.AppendAsync" />.
-/// </summary>
 public sealed class IngestRunner<TDoc>(
     DataContext db,
     IIngest<TDoc> ingest,
@@ -30,9 +25,7 @@ public sealed class IngestRunner<TDoc>(
     ILoggerFactory loggerFactory,
     IServiceProvider services) : IIngestRunner where TDoc : class
 {
-    // Guards _currentIngestingPayload — the latest snapshot for the in-flight Ingesting tick. The per-second
-    // timer and the main pipeline both mutate it from different threads, so a single locked field is safer than
-    // a plain reference.
+    // Guards _currentIngestingPayload; the progress timer and the main pipeline write it from different threads.
     private readonly object _gate = new();
     private readonly ILogger _logger = loggerFactory.CreateLogger($"{typeof(TDoc).GetAssemblySourceKey()}Ingestor");
     private readonly Stopwatch _stopwatch = new();
@@ -42,8 +35,7 @@ public sealed class IngestRunner<TDoc>(
 
     private IngestEventPayload? _currentIngestingPayload;
 
-    // Non-zero if any document failed to index. A non-zero count fails the run and skips alias promotion so an
-    // incomplete index is never served behind the live search alias.
+    // Non-zero fails the run and skips alias promotion so an incomplete index is never aliased.
     private long _failedDocuments;
 
     private long _produced;
@@ -96,8 +88,7 @@ public sealed class IngestRunner<TDoc>(
                         Interlocked.Add(ref _produced, count);
                     }
                 },
-                // Without these, ES bulk errors / dropped docs are invisible and the run would still alias and
-                // report Succeeded over an incomplete index. Any failure here fails the run (see the gate below).
+                // Surface bulk/per-item errors so the gate below fails the run instead of aliasing junk.
                 ExportResponseCallback = (response, _) =>
                 {
                     if (response is { Items: { } items }
@@ -148,7 +139,7 @@ public sealed class IngestRunner<TDoc>(
                                  IngestEventPayload.Ingesting? tick = null;
                                  lock (_gate)
                                  {
-                                     // Re-check under the lock so a tick can't overwrite a newer (e.g. Draining) state.
+                                     // Re-check so a tick can't overwrite a newer (e.g. Draining) state.
                                      if (_currentIngestingPayload is IngestEventPayload.Ingesting)
                                      {
                                          var next = new IngestEventPayload.Ingesting(Snapshot());
@@ -199,8 +190,6 @@ public sealed class IngestRunner<TDoc>(
                 }
             }
 
-            // Gate: if any document failed to index, fail the run. For a full run this means the freshly built
-            // index is NOT promoted to the live alias — we never serve search over an incomplete index.
             long failedDocuments = Interlocked.Read(ref _failedDocuments);
             if (failedDocuments > 0)
             {
@@ -224,7 +213,7 @@ public sealed class IngestRunner<TDoc>(
         }
         catch (OperationCanceledException e)
         {
-            // Use CancellationToken.None for the terminal write so the cancel reason actually lands in the log.
+            // None so the terminal write isn't itself cancelled.
             await Advance(run, new IngestEventPayload.Canceled("Canceled: " + e.Message), CancellationToken.None);
         }
         catch (Exception e)

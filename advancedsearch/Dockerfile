@@ -10,8 +10,7 @@ COPY apache-conf/robots.txt      /opt/rh/httpd24/root/var/www/html/
 
 RUN mkdir -p /var/www/html/
 
-# Angular SPA build output. The build script writes to dist/dse/ by convention
-# (see angular.json `outputPath`); keep that in sync if the project is renamed.
+# Angular outputPath (angular.json).
 COPY dist/dse/ /var/www/html/
 
 # Reset permissions of filesystem to default values

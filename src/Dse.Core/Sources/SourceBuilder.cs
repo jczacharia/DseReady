@@ -42,11 +42,7 @@ public sealed class SourceBuilder
     public IServiceCollection Services { get; }
     public SourceKey SourceKey => _module.SourceKey;
 
-    /// <summary>
-    ///     Register the source's ingest pipeline. Adds the broadcaster once (idempotent), binds
-    ///     <see cref="IIngest{TDoc}" /> to the supplied implementation, and registers a keyed
-    ///     <see cref="IIngestRunner" /> the dispatcher resolves by <see cref="SourceKey" />.
-    /// </summary>
+    /// <summary>Wire the source's ingest pipeline: broadcaster, <see cref="IIngest{TDoc}" />, keyed runner.</summary>
     public void AddIngestion<TDoc, TIngest>()
         where TDoc : class
         where TIngest : class, IIngest<TDoc>
