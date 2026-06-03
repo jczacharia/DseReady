@@ -25,4 +25,16 @@ public static class Utils
 
         return source;
     }
+
+    public static async Task IgnoreException(Func<Task> deleteCall)
+    {
+        try
+        {
+            await deleteCall();
+        }
+        catch
+        {
+            // Ignored
+        }
+    }
 }

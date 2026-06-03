@@ -14,25 +14,14 @@ public sealed record LocalCredentials(string Username, string Password);
 [Union]
 public abstract partial record DseEnv
 {
+    public const string DeploymentTierEnvVarName = "DEPLOYMENT_ENVIRONMENT";
+
     public static readonly bool IsReleaseBuild = Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyConfigurationAttribute>()
         ?.Configuration == "Release";
 
-    public const string DeploymentTierEnvVarName = "DEPLOYMENT_ENVIRONMENT";
     private DseEnv(string name) => Name = name;
     public string Name { get; }
-
-    public sealed record Dev() : DseEnv("DEV");
-
-    public sealed record Test() : DseEnv("TEST");
-
-    public sealed record Rnd() : DseEnv("RND");
-
-    public sealed record Uat() : DseEnv("UAT");
-
-    public sealed record Qa() : DseEnv("QA");
-
-    public sealed record Prod() : DseEnv("PROD");
 
     public bool IsDeployment => this is Rnd or Uat or Qa or Prod;
 
@@ -77,6 +66,18 @@ public abstract partial record DseEnv
 
         return result;
     }
+
+    public sealed record Dev() : DseEnv("DEV");
+
+    public sealed record Test() : DseEnv("TEST");
+
+    public sealed record Rnd() : DseEnv("RND");
+
+    public sealed record Uat() : DseEnv("UAT");
+
+    public sealed record Qa() : DseEnv("QA");
+
+    public sealed record Prod() : DseEnv("PROD");
 }
 
 public static class DseEnvironmentExtensions

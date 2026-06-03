@@ -1,3 +1,6 @@
+// Copyright (c) PNC Financial Services. All rights reserved.
+
+
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Nodes;
 using Microsoft.Extensions.Configuration;

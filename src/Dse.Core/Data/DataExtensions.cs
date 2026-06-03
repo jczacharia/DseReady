@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Weasel.Core;
+using Weasel.Sqlite;
 using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Data;
@@ -34,5 +36,7 @@ public static class DataExtensions
             dbCtxOpts.UseSqlite(sp.GetSqliteConnectionString());
             dbCtxOpts.UseProjectables();
         });
+
+        builder.Services.AddSingleton<Migrator>(new SqliteMigrator());
     }
 }

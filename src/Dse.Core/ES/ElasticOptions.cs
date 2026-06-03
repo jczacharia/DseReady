@@ -17,8 +17,6 @@ public sealed class ElasticOptions
 
 public sealed class ElasticOptionsValidator : AbstractValidator<ElasticOptions>
 {
-    public ElasticOptionsValidator()
-    {
+    public ElasticOptionsValidator() =>
         RuleFor(o => o.BaseAddress).NotEmpty().Must(uri => Uri.IsWellFormedUriString(uri, UriKind.Absolute));
-    }
 }

@@ -26,6 +26,7 @@
     <PackageReference Include="Thinktecture.Runtime.Extensions" Version="9.7.1"/>
     <PackageReference Include="Thinktecture.Runtime.Extensions.Json" Version="9.7.1"/>
     <PackageReference Include="UnitsNet" Version="5.75.0"/>
+    <PackageReference Include="Weasel.Sqlite" Version="8.15.2" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="5.39.3" />
     <PackageReference Include="WolverineFx.HealthChecks" Version="5.39.3" />
     <PackageReference Include="WolverineFx.Sqlite" Version="5.39.3" />

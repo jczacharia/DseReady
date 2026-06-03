@@ -2,9 +2,11 @@
 
 
 using System.Diagnostics;
-using Dse.ES;
 using Dse.Runtime;
+using Dse.Shared;
 using Dse.Tests;
+using Elastic.Clients.Elasticsearch;
+using Elastic.Mapping;
 using JasperFx.CommandLine;
 using JasperFx.Resources;
 using Microsoft.AspNetCore.Authentication;
@@ -26,16 +28,17 @@ public sealed class TestFixture : IAsyncLifetime
 {
     private const string ElasticVersion = "8.19.14";
     private const int ElasticPort = 9200;
+
+    private const string SqlLiteConnectionString = "Data Source=dse.db";
     private static readonly TimeSpan s_readinessTimeout = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
 
-    private Process? _process;
-
     private IAlbaHost? _host;
-    public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
 
-    private const string SqlLiteConnectionString = "Data Source=dse.db";
+    private Process? _process;
+    public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
+    protected CancellationToken Ct => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
     {
@@ -98,7 +101,7 @@ public sealed class TestFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        await (_host?.StopAsync() ?? Task.CompletedTask);
+        await (_host?.StopAsync(Ct) ?? Task.CompletedTask);
         await (_host?.DisposeAsync() ?? ValueTask.CompletedTask);
 
         if (_process is null)
@@ -111,7 +114,7 @@ public sealed class TestFixture : IAsyncLifetime
             if (!_process.HasExited)
             {
                 _process.Kill(true);
-                await _process.WaitForExitAsync().WaitAsync(s_shutdownTimeout);
+                await _process.WaitForExitAsync(Ct).WaitAsync(s_shutdownTimeout, Ct);
             }
         }
         catch
@@ -122,6 +125,24 @@ public sealed class TestFixture : IAsyncLifetime
         {
             _process.Dispose();
             _process = null;
+        }
+    }
+
+    public async Task TearDownAsync(IServiceProvider services)
+    {
+        await Host.ResetResourceState(Ct);
+
+        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
+        // We don't add it add all so behavior is the same.
+
+        var esClient = services.GetRequiredService<ElasticsearchClient>();
+        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
+        {
+            string index = typeContext.ResolveIndexFormat();
+            Assert.StartsWith("test-", index);
+            await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
         }
     }
 
@@ -237,7 +258,7 @@ public sealed class TestFixture : IAsyncLifetime
         {
             try
             {
-                while (await _process.StandardOutput.ReadLineAsync() is not null)
+                while (await _process.StandardOutput.ReadLineAsync(Ct) is not null)
                 {
                     /* drain */
                 }
@@ -246,12 +267,12 @@ public sealed class TestFixture : IAsyncLifetime
             {
                 /* process exited */
             }
-        });
+        }, Ct);
         _ = Task.Run(async () =>
         {
             try
             {
-                while (await _process.StandardError.ReadLineAsync() is not null)
+                while (await _process.StandardError.ReadLineAsync(Ct) is not null)
                 {
                     /* drain */
                 }
@@ -260,7 +281,7 @@ public sealed class TestFixture : IAsyncLifetime
             {
                 /* process exited */
             }
-        });
+        }, Ct);
 
         string url = $"http://127.0.0.1:{ElasticPort}";
         await WaitForReadyAsync(url);

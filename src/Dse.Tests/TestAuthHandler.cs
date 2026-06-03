@@ -22,7 +22,7 @@ public sealed class TestAuthHandler(
             return Task.FromResult(AuthenticateResult.Fail("UserTenant not found in HttpContext.Items"));
         }
 
-        ClaimsIdentity identity = new ClaimsIdentity(Scheme.Name);
+        var identity = new ClaimsIdentity(Scheme.Name);
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
 
         if (Context.Items.ContainsKey("TestRoles") && Context.Items["TestRoles"] is string[] roles)

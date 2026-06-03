@@ -1,3 +1,6 @@
+// Copyright (c) PNC Financial Services. All rights reserved.
+
+
 using System.Security.Authentication;
 using Dse.Data;
 using Dse.Shared;
@@ -30,6 +33,7 @@ public static class MessagingExtensions
 
             opts.PersistMessagesWithSqlite(builder.Configuration.GetSqliteConnectionString());
             opts.UseEntityFrameworkCoreTransactions();
+            opts.UseEntityFrameworkCoreWolverineManagedMigrations();
 
             opts.Policies.AutoApplyTransactions();
             opts.Policies.UseDurableLocalQueues();

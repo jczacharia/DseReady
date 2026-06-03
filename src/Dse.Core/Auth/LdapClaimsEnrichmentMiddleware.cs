@@ -11,7 +11,7 @@ public sealed class LdapClaimsEnrichmentMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IServiceProvider services)
     {
-        foreach (var existingId in context.User.Identities.Where(i => i.IsAuthenticated))
+        foreach (ClaimsIdentity existingId in context.User.Identities.Where(i => i.IsAuthenticated))
         {
             if (existingId.FindFirst(ClaimTypes.NameIdentifier)?.Value is { Length: > 0 } uid)
             {

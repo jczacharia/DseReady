@@ -2,7 +2,6 @@
 
 
 using Microsoft.EntityFrameworkCore;
-using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Data;
 

@@ -12,12 +12,10 @@ namespace Dse.Tests.ES;
 public sealed class ElasticHealthCheckTests(ITestOutputHelper toh, TestFixture fixture) : TestBed(toh, fixture)
 {
     [Fact]
-    public async Task ReadyEndpoint_WithLiveCluster_ReportsHealthy()
-    {
+    public async Task ReadyEndpoint_WithLiveCluster_ReportsHealthy() =>
         await Scenario(s =>
         {
             s.Get.Url("/api/health/elastic");
             s.StatusCodeShouldBeOk();
         });
-    }
 }
