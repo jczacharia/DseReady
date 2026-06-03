@@ -86,31 +86,23 @@ internal sealed class Program
             .AddAuthorizationBuilder()
             .SetDefaultPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
-        // Apache proxies "/adv/api/*" to "searchapi/api/*" — we receive "/api/*" with no idea about the
-        // "/adv" prefix. Trust the X-Forwarded-* headers apache sends so PathBase reflects the EXTERNAL
-        // base ("/adv/api"), which makes LinkGenerator emit correct Location headers and lets the Swagger
-        // PreSerializeFilter advertise the real servers URL to browsers.
+        // Trust apache's X-Forwarded-* so PathBase reflects "/adv/api" (X-Forwarded-Prefix + UsePathBase).
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedProto
                                        | ForwardedHeaders.XForwardedHost
                                        | ForwardedHeaders.XForwardedPrefix;
-            // Inside OpenShift the proxy IP is dynamic and not in the default KnownNetworks list, so the
-            // forwarded headers would be dropped silently. Clear the allow-list to trust whatever forwards
-            // to us — the pod is only reachable via the cluster Route, which is the trust boundary.
+            // OpenShift proxy IP is dynamic; cluster Route is the trust boundary.
             options.KnownNetworks.Clear();
             options.KnownProxies.Clear();
         });
 
         WebApplication app = builder.Build();
 
-        // MUST run before anything that inspects Scheme/Host/PathBase (UsePathBase, LinkGenerator,
-        // Swashbuckle). Translates apache's X-Forwarded-* into the request's canonical fields.
+        // Must run before anything that reads Scheme/Host/PathBase.
         app.UseForwardedHeaders();
 
-        // UsePathBase is non-strict: it strips "/api" if present but does NOT reject requests that
-        // lack the prefix, which lets /swagger/index.html alias /api/swagger/index.html. Gate the
-        // pipeline to "/api/*" before UsePathBase so the strip-then-route only ever sees /api requests.
+        // UsePathBase is non-strict; reject unprefixed paths so /swagger doesn't alias /api/swagger.
         app.Use(async (ctx, next) =>
         {
             if (!ctx.Request.Path.StartsWithSegments("/api"))
@@ -123,8 +115,6 @@ internal sealed class Program
         });
         app.UsePathBase("/api");
 
-        // Exception handling must come early so it can catch failures from every middleware below it —
-        // HTTPS redirect, Swagger, auth, the LDAP enrichment middleware, and the routed endpoints.
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
@@ -142,20 +132,15 @@ internal sealed class Program
 
         app.UseStaticFiles();
 
-        // Hardcoded override for the OpenAPI `servers` URL. Set OpenApi__ExternalBaseUrl in the deployment
-        // env (e.g. "https://search-rnd.pncint.net/adv/api") as a safety net when the apache change that
-        // sets X-Forwarded-Prefix hasn't shipped yet, OR to pin an absolute URL regardless of headers.
+        // Pinned servers URL override (env OpenApi__ExternalBaseUrl) — safety net if apache's
+        // X-Forwarded-Prefix isn't set yet.
         string? configuredExternalBase = app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/');
 
         app.UseSwagger(o =>
         {
             o.RouteTemplate = "swagger/{documentName}/swagger.json";
 
-            // Without this, the OpenAPI doc has no `servers` entry; Swagger UI then resolves operation
-            // paths against the host root and fires "Try it out" requests at /api/... — missing the
-            // /adv prefix the reverse proxy expects, producing 404s. PathBase here is fed by
-            // X-Forwarded-Prefix (apache must `RequestHeader set X-Forwarded-Prefix "/adv"`), so the
-            // emitted server URL is the real external base in every environment.
+            // Without an explicit servers entry, "Try it out" fires at /api/... missing the /adv prefix.
             o.PreSerializeFilters.Add((document, httpReq) =>
             {
                 string url = configuredExternalBase
