@@ -8,7 +8,10 @@ using Dse.Sources.Confluence;
 using JasperFx;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Thinktecture.Swashbuckle;
 
@@ -42,16 +45,7 @@ internal sealed class Program
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
         builder.AddServiceDefaults();
 
-        builder.Services.AddSourceModule<ConfluenceModule>();
-
-        builder.Services.AddEndpoints([typeof(Program).Assembly]);
-        builder.Services.AddSignalR(e =>
-        {
-            if (!builder.Environment.IsProduction())
-            {
-                e.EnableDetailedErrors = true;
-            }
-        });
+        builder.Services.AddSourceManifest<Confluence>();
 
         builder.Services
             .AddEndpointsApiExplorer()
@@ -70,6 +64,14 @@ internal sealed class Program
                 });
             })
             .AddThinktectureOpenApiFilters();
+
+        builder.Services.AddSignalR(e =>
+        {
+            if (!builder.Environment.IsProduction())
+            {
+                e.EnableDetailedErrors = true;
+            }
+        });
 
         if (builder.Environment.EnvironmentName != "Test")
         {
@@ -101,18 +103,6 @@ internal sealed class Program
 
         // Must run before anything that reads Scheme/Host/PathBase.
         app.UseForwardedHeaders();
-
-        // UsePathBase is non-strict; reject unprefixed paths so /swagger doesn't alias /api/swagger.
-        app.Use(async (ctx, next) =>
-        {
-            if (!ctx.Request.Path.StartsWithSegments("/api"))
-            {
-                ctx.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
-
-            await next();
-        });
         app.UsePathBase("/api");
 
         app.UseExceptionHandler();
@@ -158,13 +148,19 @@ internal sealed class Program
         });
         app.MapSwagger();
 
-        app.MapDefaultEndpoints().AllowAnonymous();
+        app.MapDefaultHealthChecks().AllowAnonymous();
 
         app.UseAuthentication();
         app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         app.UseAuthorization();
 
-        app.MapEndpoints().RequireAuthorization();
+        RouteGroupBuilder sources = app.MapGroup("sources").RequireAuthorization();
+
+        foreach (var module in app.Services.GetServices<SourceModule>())
+        {
+            module.Configure(sources);
+        }
+
         return await app.RunJasperFxCommands(args);
     }
 }

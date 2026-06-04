@@ -2,7 +2,6 @@
 
 
 using System.Text.Json;
-using Dse.Shared;
 using HtmlAgilityPack;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -19,14 +18,14 @@ namespace Dse.Sources.Confluence;
 ///     We deliberately do NOT proxy assets (images, etc.): serving Confluence-hosted binaries through this app is a
 ///     PII exposure risk. Images that need a session simply won't render here; the user clicks through to see them.
 /// </summary>
-public sealed class ConfluenceBodyViewEndpoint : IEndpoint
+public static class ConfluenceBodyViewEndpoint
 {
     // Only the rendered representations — never storage/editor (internal formats, not for display). export_view
     // already absolutizes internal links; view leaves them relative. Either way we absolutize below.
     private static readonly HashSet<string> s_allowedRepresentations =
         new(StringComparer.Ordinal) { "export_view", "anonymous_export_view", "view" };
 
-    public void MapEndpoint(IEndpointRouteBuilder builder) => builder
+    public static void MapConfluenceBodyViewEndpoint(this IEndpointRouteBuilder builder) => builder
         .MapGet("sources/confluence/content/{contentId}/body-view", async Task<IResult> (
             string contentId,
             [FromQuery] string? bodyExport,
@@ -47,7 +46,7 @@ public sealed class ConfluenceBodyViewEndpoint : IEndpoint
             }
 
             // Read-through client: its resilience pipeline owns the timeout, so no hand-rolled cancellation here.
-            HttpClient client = httpClientFactory.CreateClient(ConfluenceModule.ReadThroughClient);
+            HttpClient client = httpClientFactory.CreateClient(ConfluenceHttpClients.ReadThroughClient);
 
             try
             {

@@ -1,0 +1,2769 @@
+Architecture Linkage
+
+Lifecycles from SoR and link to architecture definition of the software component for this shared service
+https://pncbank.pvcloud.com/tip/do/widget/editComponent?id=10217028&mode=view
+Architecture heirarchy
+Technology Capability Model v3.0 => Security Platforms & Services (TCM 3.0) => Identity & Access Services (TCM 3.0) => Directory Services (TCM 3.0)
+Artifact Conventions
+YES = The feature, capability, location, or condition applies or is supported in the context of the table where it appears
+
+NO = The feature, capability, location, or condition does not apply or is not supported in the context of the table where it appears.
+
+ Location instructions
+
+Location	
+ Consumable Info 
+
+Hosted Info
+
+Indicates datacenter or region	
+Available to be consumed from the location indicated
+
+Service is hosted in this location
+
+White background black text
+indicates PNC owned Data centers 	
+light orange background with black text
+indicates cloud spaces 
+
+ 
+
+Page Contents
+
+Pattern Overview
+About
+Introduction
+Pattern Scope
+Key Constraints
+Data
+Exposure
+Patterns (Informs ARIS & Provisioning Implementations)
+Security Groups
+Windows Non‑Human Accounts
+Group Managed Service Accounts (gMSA)
+Lightweight Directory Access Protocol (LDAP) Delegated Authentication/Authorization
+Kerberos Authentication
+Supported Shared Service Criticality Levels
+Deployment Variables and Outputs
+Security Group
+Deployment Variables
+Deployment Outputs
+Windows Non-Human Account
+Deployment Variables
+Deployment Outputs
+Group Managed Service Account
+Deployment Variables
+Deployment Outputs
+LDAP Delegated Authentication/Authorization
+Kerberos Authentication
+Deployment Variables
+Domains, Environments and Locations
+Domains
+Environments
+Locations
+Service Offerings
+Guidance
+Implementation Guide
+LDAP Authentication - Enterprise Technology - Directory Services - Confluence
+Consumption Guidance
+Group Managed Service Account (gMSA) or Windows Non-Human Account
+Kerberos Authentication
+Reference Materials
+Security
+Hardening reference:
+
+
+
+
+Pattern Overview
+
+
+About this Pattern
+About
+Owned by:  Enterprise Technology - CPS - WIE - Active Directory
+
+Category:  Security Platforms & Ecosystem => Identity & Access Mgmt => Directory Services
+
+Shared Service Engineering Pattern: A logical representation (Or usage guidance) of best practice and approved configuration required to interact with a shared service in a successful and policy-compliant way to assist automation provisioning and Service Designers.  Application owners and others may reference this for informational purposes.  Pattern data are provided by the subject matter expert from the respective engineering team, and collected and categorized by the Shared Service architecture team.
+
+Intended Audience
+
+Architects
+Service Designer
+Provisioning Team
+Application Technical Leads
+
+
+Introduction
+Introduction 
+Active Directory Domain Services (AD DS), provides the methods for storing directory data and making this data available to network users and administrators. AD DS stores information about user accounts, such as names, passwords, phone numbers, and so on. AD DS also provides a way for authorized users on the same network to access this information. AD DS includes:
+
+Schema that defines the classes of objects and attributes contained in the directory, the constraints and limits on instances of these objects, and the format of their names.
+Global Catalog that contains information about every object in the directory. Users and administrators can use the catalog to find directory information regardless of the directory domain that actually contains the data.
+Query and index mechanism, so that objects and their properties can be published and found by network users or applications.
+Replication service that distributes directory data across a network.
+Sign-in authentication and access control to objects in the directory.
+Group Policy enables configuration and settings management of user and computer settings on computers running Windows Server and Windows Client operating systems.
+Active Directory Domain Services exists in all environments at PNC under the WDS mnemonic.
+
+.
+
+Scope
+Pattern Scope
+In-Scope Items
+
+Common services used for application integration as identified by the owning team
+Security Groups
+Non-Human Accounts
+Lightweight Directory Access Protocol (LDAP) Delegated Authentication/Authorization
+Kerberos Authentication
+Out of Scope
+
+Services infrequently used for application integration
+Indirect integrations
+Active Directory metadata is often used as the source of directory object information for Identity Federation:
+This pattern describes only common, frequently-used authentication/authorization scenarios where the authentication/authorization is handled directly by Active Directory.
+This pattern does not describe scenarios where metadata from Active Directory is used by other authentication providers or directories.
+Selection criteria:
+Multiple Directory Service solutions are contained within the Technology Capability Model. The goal of this Engineering Pattern is not to serve as a decision tree or selection criteria between these Directory Services.
+
+
+Key Constraints
+Key Constraints
+Data
+Data Classes *	Supported
+Are Highly Confidential data storing or processing use cases supported in this pattern?	
+NO
+
+Are Confidential data storing or processing use cases supported in this pattern?	
+NO
+
+Exposure
+Internet Facing *	Supported
+Are direct Internet Facing deployment use cases supported in this pattern?	
+ NO
+
+* Use case specific solution scenarios for data handling and internet exposure are out of scope for this pattern. Compliance with published policy is required. 
+
+
+
+Patterns (Informs ARIS & Provisioning Implementations) 
+Security Groups
+Security groups are the primary mechanism for authorization within on‑premises Active Directory. The platform provides a consistent set of standards for how groups must be created, administered, delegated, and consumed.
+
+Group Types & Usage
+Domain Local (DL): Used for resource authorization within a single domain.
+Global (G): Used to group users, service accounts, or other principals that share a common business function.
+Universal (U): Restricted; typically reserved for cross-domain scenarios.
+Naming Standard:
+Group Creation Standards document
+
+Access Assignment:
+Groups, not individual principals, are assigned to resource ACLs by default.
+Windows Non‑Human Accounts
+Non‑Human Accounts are used for application or service-level authentication and execution. 
+
+Naming Standard:
+AD Non-Human Account Naming - Workforce Identity and Access Management Team - Confluence
+Group Managed Service Accounts (gMSA)
+gMSAs are the preferred account type for compatible Windows Services.
+
+Naming Standard:
+Requesting Shared Group Managed Service Accounts - L4 Windows Support - Confluence
+Password Management:
+Managed entirely by Active Directory. No additional clients or external tools are required for these accounts to be utilized.
+Host Restrictions:
+gMSAs must specify which hosts (servers or clusters) are authorized to retrieve credentials.
+These Active Directory computer account associated with the host is placed into a Security Group that allows credential retrieval.
+Hosts must be domain joined.
+
+
+Lightweight Directory Access Protocol (LDAP) Delegated Authentication/Authorization
+The LDAP service enables applications to query directory objects, authenticate accounts, or retrieve group membership data.
+
+Approved LDAP Endpoints: Always use the DNS hostname of the domain:
+prod.intdomain.net
+ldaps://prod.intdomain.net:636
+Encryption Requirement:
+LDAPS (TCP 636) required for authentication or any structured directory queries containing credentials.
+Bind Types:
+Simple Bind over LDAPS for service accounts.
+Negotiate/Kerberos bind preferred when domain-joined.
+Kerberos Authentication
+Kerberos is the required authentication protocol for domain-joined servers, multi-tier applications, and systems needing mutual authentication.
+
+SPN Naming:
+Must follow RFC-compliant patterns such as:
+HTTP/<hostname>
+MSSQLSvc/<hostname>:<port>
+HOST/<hostname>
+Binding Restrictions:
+SPNs may only be associated with:
+Group Managed Service Accounts
+Non-Human Accounts
+Host computer accounts
+Duplicate SPNs are blocked and must be remediated before registration.
+
+
+Supported Shared Service Criticality Levels
+Criticality Level	Supported
+CL-0	Y
+CL-1	Y
+CL2-5	Y
+
+
+Deployment Variables and Outputs
+Security Group
+Deployment Variables
+(Parameters and conditions that are specific to a product to produce the engineering pattern.)
+
+Name
+
+Required
+
+Description
+
+Example
+
+Domain	Yes	The domain in which the group will be created.	Production, RND, TEST, QA
+Group Scope	Yes	Defines the extent to which the group is applied in the domain tree or forest. More Information. 	Universal, Domain Local
+Permission Code 1	Yes	
+Identifies the usage of the security group. More Information and options.
+
+apa, fsa, srv
+
+Permission Code 2	Yes	
+Identifies the permissions granted by the security group. More Information and options.
+
+FC, RO, RW
+
+Membership Code	Yes	
+Identifies what objects can be members of the security group. More Information and options.
+
+a, g, m, s, u
+
+Display Name	Yes	
+The Display Name must provide a concise, user-friendly name of the access. Only mnemonics should be in all capital letters and acronyms should be spelled out. The Display name should begin with your application's mnemonic. IMPORTANT NOTE: The ONLY special character permitted in the Display Name is a period. Parenthesis are only to be used for the environment.
+
+ABC.Engineering Pattern Administrator User
+
+Description	Yes	
+The Description should provide enough detail for a user requesting, approving, or certifying access to determine if it is the correct access, keeping in mind that users may not have much background or context, and/or may not be technical. Descriptions must be complete sentences and end with a period. Abbreviations can be used in the description as long as the abbreviations are spelled out in the display name. Descriptions may not contain the following special characters:  percent sign (%) or apostrophe sign (‘).
+
+Grants full admin access to Engineering Patterns stored in Solutions Consulting Confluence Site.
+
+Deployment Outputs
+Name	Description	Example
+Group Name	Calculated value based on input variables above.	GSGu_XYZ_GroupThatGivesAccessToXYZApp
+Distinguished Name	Unique text string that identifies a directory object and specifies its exact location within a hierarchical directory.	cn=John Doe,ou=People,dc=example,dc=com 
+Globally Unique Identifier (GUID	A 128-bit number used in computing to uniquely identify information, resources, or objects in a directory.	6B29FC40-CA47-1067-B31D-00DD010662DA
+
+Windows Non-Human Account
+Deployment Variables
+(Parameters and conditions that are specific to a product to produce the engineering pattern.)
+
+Name
+
+Required
+
+Description
+
+Example
+
+Mnemonic	Yes	The mnemonic requesting the new non-human account	ABC
+Domain	Yes	The domain in which the account will be created.	Prod, QA, RND
+Windows Servers	No	
+If the account is to be used on Windows Servers, they should be listed here.
+
+server1.domain.net, server2.domain.net
+
+Grant Local Administrator Access	If Windows Servers are listed	
+Sets the account as a local administrator on listed Windows Servers.
+
+yes,no
+
+Grant Remote Desktop Access	If Windows Servers are listed	
+Provides remote desktop access to the account on any listed Windows Servers.
+
+yes,no
+
+Deployment Outputs
+Name	Description	Example
+Account Name	Name of the Windows Non-Human Account created. This is a calculated value based on inputs and naming standards.	
+XSABCsrv001
+
+
+
+Distinguished Name	Unique text string that identifies a directory object and specifies its exact location within a hierarchical directory.	cn=John Doe,ou=People,dc=example,dc=com 
+Globally Unique Identifier (GUID	A 128-bit number used in computing to uniquely identify information, resources, or objects in a directory.	6B29FC40-CA47-1067-B31D-00DD010662DA
+Group Managed Service Account
+Deployment Variables
+(Parameters and conditions that are specific to a product to produce the engineering pattern.)
+
+Name
+
+Required
+
+Description
+
+Example
+
+Domain	Yes	
+The domain in which the account will be created.
+
+ABC
+Mnemonic	Yes	The mnemonic requesting the new non-human account	Prod, QA, RND
+Descriptor	Yes	
+The Descriptor designates the intended configuration point of the service account. Available Descriptors
+
+srv,iis,tsk
+
+Windows Servers	Yes	
+List of the Windows Servers the gMSA will be utilized on.
+
+server1.domain.net, server2.domain.net
+
+Grant Local Administrator Access	Yes	
+Sets the account as a local administrator on listed Windows Servers.
+
+yes,no
+
+Deployment Outputs
+Name	Description	Example
+Security Group Name	Security Group created for the gMSA. Calculated value based on inputs and Security Group Naming standards.	GSGs_ABC_XMABCsrv001
+Service Account Name	Name of the Group Managed Service Account created. This is a calculated value based on inputs and gMSA naming standards.	
+XMABCsrv001
+
+
+
+Distinguished Name	Unique text string that identifies a directory object and specifies its exact location within a hierarchical directory.	cn=John Doe,ou=People,dc=example,dc=com 
+Globally Unique Identifier (GUID	A 128-bit number used in computing to uniquely identify information, resources, or objects in a directory.	6B29FC40-CA47-1067-B31D-00DD010662DA
+LDAP Delegated Authentication/Authorization
+This requires a non-human account to act as a Bind user. See Windows Non-Human Account section above.
+
+Kerberos Authentication
+Deployment Variables
+(Parameters and conditions that are specific to a product to produce the engineering pattern.)
+
+Name
+
+Required
+
+Description
+
+Example
+
+Service Class	Yes	A string that identifies the general class of service. There are well-known service class names, such as "www" for a web service or "ldap" for a directory service. In general, this can be any string that is unique to the service class. Be aware that the SPN syntax uses a forward slash (/) to separate elements, so this character cannot appear in a service class name.	MSSQLSvc
+Fully Qualified Domain Name(s)	Yes	The name(s) of the computer(s) on which the service is running.	
+server1.domain.net
+
+server2.domain.net
+
+Port	No	
+A port number is not required but can be used to differentiate between multiple instances of the same service class on a single host.
+
+1433
+
+443
+
+Service Name	No	
+An optional name used in the SPNs of a replicable service to identify the data or services provided by the service or the domain served by the service. This component can have one of the following formats:
+
+The distinguished name or objectGUID of an object in Active Directory Domain Services, such as a service connection point (SCP).
+The DNS name of the domain for a service that provides a specified service for a domain as a whole.
+The DNS name of an SRV or MX record.
+cn=Server01,ou=Servers,dc=example,dc=com
+
+Domains, Environments and Locations
+
+
+Domains 
+Domain	Supported
+Research and Development	
+Yes
+
+User Acceptance Testing	
+Yes
+
+Quality Assurance	
+Yes
+
+Production	
+Yes
+
+Environments
+Domain	Supported
+Dev: Research and Development	
+Yes
+
+Test 	
+Yes
+
+QA: Quality Assurance	
+Yes
+
+Production	
+Yes
+
+Locations
+Location	 Consumable	Hosted 
+GF0	
+Yes
+
+Yes
+
+GF1 	
+Yes
+
+Yes
+
+GF2	
+Yes
+
+Yes
+
+DCE1	
+Yes
+
+Yes
+
+DCE2	
+Yes
+
+Yes
+
+DCE3	
+Yes
+
+Yes
+
+DCC1	
+TBD
+
+TBD
+
+DCC2	
+TBD
+
+TBD
+
+DCC3	
+TBD
+
+TBD
+
+AWS East1	
+No 
+
+No
+
+AWS West2	
+No 
+
+No
+
+Azure East2 	
+Yes 
+
+No
+
+Azure Central 	
+Yes
+
+No
+
+Note: PNC currently doesn't permit Cross Cloud Services access. 
+
+Service Offerings
+Service Offering Name	What This Service Does / Benefits	Agent Required for this Service Offering?
+Security Group	
+Security Groups can be assigned rights and permissions in Active Directory and shared resources that cascade to member objects. A security group can also be mail-enabled.
+
+No
+
+Windows Non-Human Account	
+ A domain account for both interactive and non-interactive authentication and authorization.
+
+No
+
+Group Managed Service Account (gMSA)	
+A managed domain account that provides automatic password management, simplified service principal name (SPN) management, and the ability to delegate the management to other administrators. These accounts can be used by multiple computer objects and can be used to run Windows Services, IIS Pools, Scheduled Tasks, etc. Not all applications natively support Group Managed Service Accounts.
+
+No
+
+Lightweight Directory Access Protocol (LDAP) Delegated Authentication/Authorization	
+LDAP can be used to verify a user's credentials against the information stored in the AD directory service. It enables centralized user management by allowing applications to query AD to check if a username and password are valid and that the user is authorized to access a resource.
+
+No
+
+Kerberos Authentication	
+Kerberos is a secure, ticket-based network authentication protocol that uses symmetric-key cryptography to verify user or host identities. A Service Principal Name (SPN) is generated as a unique identifier to associate a service with a specific account. SPNs enable mutual authentication, allowing clients to securely identify services without sending passwords over the network.
+
+No
+
+
+
+
+Guidance
+Implementation Guide
+Implementation Guide
+LDAP Authentication - Enterprise Technology - Directory Services - Confluence
+Usage Patterns for Group Managed Service Accounts - L4 Windows Support - Confluence
+
+Manage Group Managed Service Accounts | Microsoft Learn
+
+Secure group managed service accounts - Microsoft Entra | Microsoft Learn
+
+Configuring Kerberos Delegation for Group Managed Service Accounts | Microsoft Learn
+
+Workforce Identity and Access Management - Group Creation Standards document
+
+How to configure SPN for Windows Server | Microsoft Learn
+
+Consumption Guidance
+Consumption Guidance
+Group Managed Service Account (gMSA) or Windows Non-Human Account 
+gMSA or NHA
+
+
+
+LDAP Authentication/Authorization
+
+LDAP Search and Query Reference - Enterprise Technology - Directory Services - Confluence
+
+Kerberos Authentication
+Service principal names - Win32 apps | Microsoft Learn
+
+Reference Materials
+Reference Materials
+New & Updated Criticality Definitions, with new AZ Data Center Strategy. 
+
+Updated CL0 , CL1, CL2-5 Definitions
+EA Repository Location of Critical Levels: 
+https://app.wss.pncint.net/sites/NGP/Repository/Lists/Approved%20Definitions/AllItems.aspx?view=7&q=criticality
+Vendor reference: Active Directory Domain Services overview | Microsoft Learn
+Internal reference: Enterprise Technology - Directory Services Home - Enterprise Technology - Directory Services - Confluence
+Security
+Security
+Hardening reference: 
+https://app.wss.pncint.net/sites/CSS/SitePages/Home.aspx
+
+
+
+Version	Date	Author	Comment
+20	May 05, 2026 10:47	Derik Smith	
+19	May 04, 2026 11:41	Derik Smith	
+18	May 04, 2026 08:48	Derik Smith	
+17	May 01, 2026 15:06	Derik Smith	
+16	May 01, 2026 11:28	Derik Smith	
+
+Introduction
+Information stored in Active Directory can be accessed via standard LDAP tools and methodologies. Most commonly the connections are made via Secure LDAP (SLDAP) or LDAP over SSL.
+
+Active Directory uses the Lightweight Directory Access Protocol (LDAP) as its access protocol. LDAP search requests can be sent and received by Active Directory on port 389 (the default LDAP access port) and port 3268 (the default global catalog port). LDAP traffic that uses the Secure Sockets Layer (SSL) authentication protocol accesses ports 636 and 3269, respectively.
+
+Integrating
+Applications can leverage Active Directory for authentication and authorization.
+Application integration topics:
+The bind account
+LDAP filter (syntax)
+URI / hostname
+Base DN / search DN
+Ports, encryption, certificates
+LDAP policy, query restrictions / limitations
+Bind account
+The directory does not allow anonymous look ups, therefore an account is required to query the directory. While a personal account can be used temporarily for testing, a permanent service account should be configured within the application's LDAP configuration.
+Obtain a bind account by submitting a Powerlink Windows Non Human Account Access request.
+When setting up a production account to query user objects and/or entitlements be sure to select the "PNCNT (pncbank.com)" domain radio button on the form.
+Example bind account names are in the format: [XQ/XS][application-mnemonic][environment][LDAP]
+"XQ" for CyberArk boarded accounts, "XS" otherwise.
+"environment" can be "RND", "UAT", "QA", "PROD".
+Directory bind (XQ) accounts may have their password managed by CyberArk. The following two options are available:
+On a 2-year rotation, password lease
+On a 90-day rotation, password retrieved on demand (via AAM)
+Bind accounts are located under the following organizationalUnit structure within each domain:
+"OU=OUc_Accounts,OUu_Service"
+Bind syntax, there are three ways to specify a bind account, the application may have specific needs and/or require the id be in a particular or specific format.
+NetBIOS format: "[PNCRND|PNCUAT|PNCQA|PNCNT]\bind-account-name"
+principalName formats:
+"bind-account-name@[rnd|uat|qa].pncint.net"
+"bind-account-name@pncbank.com"
+distinguishedName formats:
+"CN=bind-account-name,OU=OUc_Accounts,OUu_Service,DC=[RND|UAT|QA],DC=PNCINT,DC=NET"
+"CN=bind-account-name,OU=OUc_Accounts,OUu_Service,DC=pncbank,DC=com"
+LDAP filter
+for user objects
+Note that computer objects inherit from the class "user" and can/should be excluded
+e.g. (!objectClass=computer)
+e.g. (&(objectClass=user)(!objectClass=computer))
+for group objects (members, entitlements), two methods:
+query the user object and review the memberOf attribute values to see if the entitlement (group object) is included / contained-within.
+query the group object and review the member attribute values to see if the user object is included / contained-within.
+"memberOf" example, see what "SCO" entitlements my ID is in:
+Get-ADUser                                     `
+  -LDAPFilter "(cn=PT43033)"                   `
+  -Properties @("memberOf")                    `
+    | Select-Object -ExpandProperty "memberOf" `
+      | Where-Object { $_ -match "^CN=GSGu_SCO_ReadOnlyOperators" }
+
+CN=GSGu_SCO_ReadOnlyOperators,OU=OUg_Applications,OU=OUc_AccessGroups,DC=pncbank,DC=com
+"member" example, see if my ID is in the "SCO_ReadOnlyOperators" group / entitlement:
+Get-ADGroup                                     `
+  -LDAPFilter "(cn=GSGu_SCO_ReadOnlyOperators)" `
+  -Properties @("member")                       `
+    | Select-Object -ExpandProperty "member"    `
+      | Where-Object { $_ -match "^CN=PT43033" }
+
+CN=PT43033,OU=OUu_Standard,OU=OUc_User,OU=OUc_Accounts,DC=pncbank,DC=com
+URI / hostname
+Always the DNS name of the domain:
+RND	
+rnd.pncint.net
+ldap://rnd.pncint.net:389
+ldaps://rnd.pncint.net:636/DC=RND,DC=PNCINT,DC=NET
+UAT	
+uat.pncint.net
+ldap://uat.pncint.net:389
+ldaps://uat.pncint.net:636/DC=UAT,DC=PNCINT,DC=NET
+QA	
+qa.pncint.net
+uccqa.pncint.net
+ldap://qa.pncint.net:389
+ldaps://qa.pncint.net:636/DC=QA,DC=PNCINT,DC=NET
+ldap://uccqa.pncint.net:389
+ldaps://uccqa.pncint.net:636/DC=UCCQA,DC=PNCINT,DC=NET
+PROD	
+pncbank.com
+prod.pncint.net
+atm.pncbank.com
+ldap://pncbank.com:389
+ldaps://pncbank.com:636/DC=pncbank,DC=com
+ldap://prod.pncint.net:389/DC=PROD,DC=PNCINT,DC=NET
+Base DN
+Also known as the "search base".
+The directory is organized by object type which optimizes the base DN's effectiveness.
+By making the base DN as specific as possible, search results will be returned faster and will reduce the load on the directory server performing the query.
+Base DN examples:
+for user objects:
+OU=OUu_Standard,OU=OUc_User,OU=OUc_Accounts,DC=RND,DC=PNCINT,DC=NET
+OU=OUu_Standard,OU=OUc_User,OU=OUc_Accounts,DC=UAT,DC=PNCINT,DC=NET
+OU=OUu_Standard,OU=OUc_User,OU=OUc_Accounts,DC=QA,DC=PNCINT,DC=NET
+OU=OUu_Standard,OU=OUc_User,OU=OUc_Accounts,DC=pncbank,DC=com
+for group objects:
+OU=OUg_Applications,OU=OUc_AccessGroups,DC=RND,DC=PNCINT,DC=NET
+OU=OUg_Applications,OU=OUc_AccessGroups,DC=UAT,DC=PNCINT,DC=NET
+OU=OUg_Applications,OU=OUc_AccessGroups,DC=QA,DC=PNCINT,DC=NET
+OU=OUg_Applications,OU=OUc_AccessGroups,DC=pncbank,DC=com
+Ports
+Using port 389
+unencrypted, not permitted for passwords / authentication
+Using port 636
+SSL vs. StartTLS
+Encryption & Certificates
+Obtaining / installing the PNC root certificate
+LDAP Policy
+To protect the directory hosts from trying to process run-away queries the following two policy settings limit the quantity of results that can be returned at a time:
+MaxPageSize - controls the number of object that are returned in a single search result. Value=1,000.
+MaxValRange - controls the number of values that are returned for an attribute of an object. Value=1,500.
+Troubleshooting
+Basic Questions:
+What specific domain controller / IP address is the application or host trying to use?
+the application should be pointed to the domain name, i.e. "pncbank.com" and NOT individual domain controller hosts.
+the domain name is served by multiple domain controllers at multiple IP addresses, "multi-homed".
+Try pinging the domain name from the host performing the query and note which IP address is resolved.
+the DNS cache may cause the ping to resolve the name to the same IP address but it is not guaranteed.
+refresh the host's DNS cache to resolve to a different domain controller. DNS assigns the various domain controller addresses in round-robin fashion so this may or may not provide a different address.
+attempt to recycle the service creating the LDAP queries.
+What is the error code being returned by the application?
+Inability to connect to LDAP
+Inability to authenticate to the directory via the bind account
+LDAP query not returning (correct) results, mistake in the filter or base DN syntax
+What service / non-human / bind account is it using to authenticate to the directory?
+Ensure the service account has not been locked out.
+Is an error returning right away or is it timing-out?
+Is it connecting via LDAP, SLDAP (LDAP over SSL), or ADSI?
+If LDAP, how are the query string and parameters configured?
+If SLDAP, check certificate and test SLDAP - Certificate Check
+Does it utilize the global catalog?
+What authentication mechanism is it using? Basic, Kerberos, NTLM?
+From what server(s) is/are the authentications coming from?
+Is the interaction something we wrote or vendor provided?
+How often does the query run? Every time a user logs in? On a schedule?
+Is the query failing every time or intermittently?
+MaxPageSize
+The number of site link connection objects exceeds the value returned by the BMC AD Replication Collector LDAP query threshold. By increasing the default number of records returned by an AD LDAP query from 1,000 to 3,000 BMC can obtain the correct and complete information.
+
+Procedure
+Run the "Windows 2000 Support Tool", ADSIEdit.
+Connect to the "Configuration Container" of the root domain controller.
+Expand:
+Configuration Container [root_domain_controller]
+CN=Configuration,DC=ntl-city,DC=net
+CN=Services
+CN=Windows NT
+CN=Directory Service
+Highlight "CN=Query-Policies"
+In the right pane, right-click on "CN=Default Query Policy" and select "Properties".
+Ensure "Select which properties to view" is set to "Optional" or "Both".
+From "Select a property to view" select "lDAPAdminLimits" from the pulldown.
+The attribute value is a multi-valued DirectoryString, highlight the "MaxPageSize" value.
+Click the "Remove" button.
+In the "Edit Attribute" field, change the value from "1000" to "3000".
+Click "Add".
+Click "Apply".
+Click "OK".
+Exit ADSI Edit.
+Queries
+Efficiency
+15 Field Engineering
+ADO logging
+External Cross-Reference
+An external cross-reference is a cross-reference object that can be created manually to provide the location of an object that is not stored in the forest. If your LDAP clients submit operations for an external portion of the global LDAP namespace against servers in your forest, and you want your forest's servers to refer the client to the correct location, you can create a cross-reference object for that directory in the Partitions container. There are two ways that external cross-references are used:
+
+To reference external directories by their disjoint directory name (a name that is not contiguous with the name of this directory tree). In this case, when you create the cross-reference, you create a reference to a location that is not a child of any object in the directory.
+To reference external directories by a name that is within the Active Directory namespace (a name that is contiguous with the name of this directory tree). In this case, when you create the cross-reference, you create a reference to a location that is a child of a real directory object.
+http://technet.microsoft.com/en-us/library/cc978014.aspx
+
+admod.exe -b "CN=PNCNT,CN=Partitions,CN=Configuration,DC=ntl-city,DC=sec" "objectClass::crossRef" "cn::PNCNT" "nCName::DC=pncbank,DC=com" "dnsRoot::pncbank.com" -add
+admod.exe -b "CN=CORPDMN,CN=Partitions,CN=Configuration,DC=forestroot,DC=com" "objectClass::crossRef" "cn::CORPDMN" "nCName::DC=corp,DC=ntl-city,DC=net" "dnsRoot::corp.ntl-city.net" -add
+Applications
+CN=XSESIDM,OU=OUu_Service,OU=OUc_Accounts,DC=PNCBANK,DC=COM
+XAFXOPSADN
+Adobe Live Cycle
+Unchecked the Group sync and ran the sync for just the Users. The User sync finished.
+Then re-checked the Groups sync, and re-entered the configuration settings (using a small population).
+When we did the full re-sync, it completed successfully. The overnight sync finished as well.
+Blue Coat (Internet Proxy)
+BMC Control-SA / Passport
+BMC WAM
+provides URL level authentication/authorization
+
+ConsultNC
+ESI (Enterprise Service Bus)
+ESI is an application that uses a "hard-coded" LDAP path for its service account. The account's current CN is CN=XSESIDM,OU=OUu_Service,OU=OUc_Accounts,DC=PNCBANK,DC=COM.
+
+FXO (Foreign Exchange)
+FXO is an application that uses a "hard-coded" LDAP path for its service account. The account's current CN is CN=XAFXOPSADN,OU=Service Accounts,DC=pncbank,DC=com and efforts are underway to move this account to OU=OUu_Service,OU=OUc_Accounts,DC=pncbank,DC=com. This is expected to be completed the weekend of 10/8/2011.
+
+HP
+Onboard Administrator
+Integrated Lights Out
+Virtual Connect
+MS Exchange
+GIR
+GIR Customer site (wsapp)
+
+The virtual directory is protected by BMC WAM. You need to be in the proper AD group to get by the BMC login page. Once you get past that you would be redirected to ContsultNC. ConsultNC creates the cookie and the NCCAuthActiveDirectory page reads the cookie. It validates that you are in the correct AD groups. This is really for admin (client admin) vs user.
+
+GIR CBAO site (wsadmin)
+
+The virutal directory is still protected by BMC WAM but any valid AD user should be allowed through. That login page we make a call to AD to validate the user's password and name. The next call validates AD group membership.
+
+Knova
+adfind.exe
+-csv
+-nodn
+-b "OU=OUc_InfoClients,DC=corp,DC=ntl-city,DC=net"
+-f "(&(objectClass=user)(cn=x*)((!(userAccountControl:1.2.840.113556.1.4.803:=2))))"
+samaccountname givenname initials sn mail streetaddress l st co postalcode telephonenumber
+ODR (Oracle Data Relationship Management)
+odr
+Service Center
+See also, Certificate.
+Quest VAS
+Documentation: VAS
+
+LDP Test
+Run the Microsoft LDAP Tool
+Note, LDP.EXE is part of the "Windows 2000 Support Tools" package. Installation files are located at "\\cleopsutl03\mfg$\Microsof\windows2000\W2K Support Tools".
+Choose one of two routes:
+Click "Start", "Run" then enter "LDP.EXE"
+Click "Start", "Programs", "Windows 2000 Support Tools", "Tools", "Active Directory Administration Tool"
+Connect Annonymously to LDAP
+Click "Connection"
+Click "Connect"
+At the "Connect" dialog box, ensure the following:
+Server: corp.ntl-city.net
+Port: 389
+Connectionless: [unchecked]
+click "OK"
+The following should appear in the right-hand window:
+ld = ldap_open("corp.ntl-city.net", 389);
+Established connection to corp.ntl-city.net.
+Retrieving base DSA information...
+Result <0>: (null)
+Matched DNs: Getting 1 entries:
+Bind to LDAP with Credentials
+Click "Connection"
+Click "Bind"
+At the "Bind" dialog box, ensure the following:
+User: [enter_x_id]
+Password: [enter_password_for_x_id]
+Domain: [checked]
+Domain: corp.ntl-city.net
+click "OK"
+The following should appear:
+res = ldap_bind_s(ld, NULL, &NtAuthIdentity, 1158); // v.3
+{NtAuthIdentity: User='xmebl32'; Pwd= <unavailable>; domain = 'corpdmn'.}
+Authenticated as dn:'[xid]'.
+Perform LDAP Search
+Click "Browse"
+Click "Search"
+At the "Search" dialog box, ensure the following:
+Base Dn: dc=corp,dc=ntl-city,dc=net
+Filter: (sAMAccountName=onevoice)
+Socpe: Subtree
+Click "Run"
+The following should appear:
+***Searching...
+ldap_search_s(ld, "dc=corp,dc=ntl-city,dc=net", 2, "(sAMAccountName=onevoice)", attrList, 1, &msg)
+Result <0>: (null)
+Matched DNs:
+Getting 1 entries:
+>> Dn: CN=OneVoice, OU=OUu_SvcAccts, OU=OUc_InfoClients, DC=corp, DC=ntl-city,DC=net
+0> canonicalName:
+0> cn:
+0> description:
+0> distinguishedName:
+0> objectClass:
+0> name:
+Click "Close"
+Disconnect LDAP Session
+Click "Connection"
+Click "Disconnect"
+VBScript Test
+set Cn = CreateObject("ADODB.Connection")
+Cn.provider = "ADSDSOObject" 
+' Unauthenticated (anonymous)
+' Cn.Open "ADs Provider"
+' Authenticated
+Cn.Open "ADs Provider", _
+        "cn=xmebl32,ou=OUu_power,ou=OUc_UsrAccts,ou=OUc_infoclients,dc=corp,dc=ntl-city,dc=net", _
+        "password" 
+s = "<LDAP://dc=corp,dc=ntl-city,dc=net>;(sAMAccountName=onevoice);adspath;subtree"
+set Rs = Cn.Execute(s)
+msgbox "rsp=" & Rs.fields("adspath")
+qn = rs.fields("adspath")
+qn = mid(qn,instr(qn,"CN="))
+msgbox "qn=" & qn
+Rs.Close
+Cn.Close
+Filter Examples
+(&(objectclass=user)(!objectclass=computer)(|(samaccountname=PL*)(samaccountname=XX*)(samaccountname=ZX*)))
+Paging and Ranging
+LDAP servers throttle results to protect themselves from long running, recursive, or expensive queries. It also helps protect against DoS (Denial of Service) attacks.
+
+Page / PagingManages the number of objects returned by a query, throttled to 1,000. See #MaxPageSize above.Range / RangingManages the number of values returned by a multi-value attribute, throttled to 1,499 results.
+
+Range Looping Example in PowerShell
+$adfind = "C:\Users\pt43033\Downloads\adfind.exe"
+$dn = "CN=GSGu_CLP_CIBRMOnboarding,OU=OUg_Applications,OU=OUc_AccessGroups,DC=pncbank,DC=com"
+# $dn = "CN=Domain Admins,OU=OUg_LegacyGroups,OU=OUc_AccessGroups,DC=pncbank,DC=com"
+
+$start = 0
+$step = 499
+$total = 0
+$range = ("member;range=" + ($start) + "-" + ($start+$step))
+
+[array]$results = &$adfind "-noautoranging" "-qlist" "-b" $dn $range
+$count = $results.Count
+$total += $count
+$times = 1
+Write-Host ("{0,25}" -f $range + "  Times: " + "{0:d3}" -f $times + "  Total: " + "{0:d4}" -f $total)
+
+while ($count -gt ($step-1))
+  {  # while
+    $times++
+    $range = ("member;range=" + ($total) + "-" + ($total+$step))
+    [array]$results = &$adfind "-noautoranging" "-qlist" "-b" $dn $range
+    $count = $results.Count
+    $total += $count
+    Write-Host ("{0,25}" -f $range + "  Times: " + "{0:d3}" -f $times + "  Total: " + "{0:d4}" -f $total)
+  }  # while
+Sample Output
+       member;range=0-499  Times: 001  Total: 0500
+     member;range=500-999  Times: 002  Total: 1000
+   member;range=1000-1499  Times: 003  Total: 1500
+   member;range=1500-1999  Times: 004  Total: 2000
+   member;range=2000-2499  Times: 005  Total: 2500
+   member;range=2500-2999  Times: 006  Total: 3000
+   member;range=3000-3499  Times: 007  Total: 3500
+   member;range=3500-3999  Times: 008  Total: 4000
+   member;range=4000-4499  Times: 009  Total: 4500
+   member;range=4500-4999  Times: 010  Total: 5000
+   member;range=5000-5499  Times: 011  Total: 5500
+   member;range=5500-5999  Times: 012  Total: 5865
+
+
+
+{
+    "took": 229,
+    "timed_out": false,
+    "_shards": {
+        "total": 1,
+        "successful": 1,
+        "skipped": 0,
+        "failed": 0
+    },
+    "hits": {
+        "total": {
+            "value": 823,
+            "relation": "eq"
+        },
+        "max_score": 300.2878,
+        "hits": [
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "995666595",
+                "_score": 300.2878,
+                "_source": {
+                    "versionWhen": "2024-08-29T11:06:55-04:00",
+                    "type": "page",
+                    "title": "PingFederate Endpoints",
+                    "body": "Workforce PingFederate RND: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 https://iam-idp-wf-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-wf-rnd.pncint.net/as/introspect.oauth2 UAT: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 https://iam-idp-wf-uat.pncint.net/as/authorization.oauth2 https://iam-idp-wf-uat.pncint.net/as/introspect.oauth2 QA: https://wfsso-qa.pnc.com/as/token.oauth2 https://wfsso-qa.pnc.com/as/authorization.oauth2 https://wfsso-qa.pnc.com/as/introspect.oauth2 PROD: https://wfsso.pnc.com/as/token.oauth2 https://wfsso.pnc.com/as/authorization.oauth2 https://wfsso.pnc.com/as/introspect.oauth2 Workforce CityPlan PingFederate RND: https://wfsso-apps-rnd.pncint.net/as/token.oauth2 https://wfsso-apps-rnd.pncint.net/as/authorization.oauth2 https://wfsso-apps-rnd.pnc.com/as/introspect.oauth2 UAT: https://wfsso-apps-uat.pnc.com/as/token.oauth2 https://wfsso-apps-uat.pnc.com/as/authorization.oauth2 https://wfsso-apps-uat.pnc.com/as/introspect.oauth2 QA: https://wfsso-apps-qa.pnc.com/as/token.oauth2 https://wfsso-apps-qa.pnc.com/as/authorization.oauth2 https://wfsso-apps-qa.pnc.com/as/introspect.oauth2 PROD: https://wfsso-apps.pnc.com/as/token.oauth2 https://wfsso-apps.pnc.com/as/authorization.oauth2 https://wfsso-apps.pnc.com/as/introspect.oauth2 Customer PingFederate RND: https://iam-idp-cst-rnd.pncint.net/as/token.oauth2 https://iam-idp-cst-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-cst-rnd.pncint.net/as/introspect.oauth2 UAT: https://iam-idp-cst-uat.pncint.net/as/token.oauth2 https://iam-idp-cst-uat.pncint.net/as/authorization.oauth2 https://iam-idp-cst-uat.pncint.net/as/introspect.oauth2 QA: https://signin-qa.pnc.com/as/token.oauth2 https://signin-qa.pnc.com/as/authorization.oauth2 https://signin-qa.pnc.com/as/introspect.oauth2 PROD: https://signin.pnc.com/as/token.oauth2 https://signin.pnc.com/as/authorization.oauth2 https://signin.pnc.com/as/introspect.oauth2 Other OAuth 2.0 Authorization Server Endpoints OAuth Token Revocation Endpoint - /as/revoke_token.oauth2 OAuth Grants Endpoint - /as/oauth_access_grants.ping OAuth Dynamic Client Registration Endpoint - /as/clients.oauth2 OpenID Connect Metadata Endpoint - /.well-known/openid-configuration JWKS Endpoints: City Plan Legacy wfsso-apps-rnd.pnc.com/ext/oauth/x509/kid?v= <KID> wfsso-apps-rnd.pnc.com/pf/JWKS https://iam-idp-wf-rnd.pncint.net/ext/oauth/x509/kid?v= <KID> https://iam-idp-wf-rnd.pncint.net/pf/JWKS wfsso-apps-qa.pnc.com/ext/oauth/x509/kid?v= <KID> wfsso-apps-qa.pnc.com/pf/JWKS http://wfsso-qa.pnc.com/ext/oauth/x509/kid?v= <KID> http://wfsso-qa.pnc.com/pf/JWKS wfsso-apps-uat.pnc.com/ext/oauth/x509/kid?v=<KID> wfsso-apps-uat.pnc.com/pf/JWKS https://iam-idp-wf-uat.pncint.net/ext/oauth/x509/kid?v= <KID> https://iam-idp-wf-uat.pncint.net/pf/JWKS wfsso-apps.pnc.com/ext/oauth/x509/kid?v=<KID> wfsso-apps.pnc.com/pf/JWKS https://wfsso.pnc.com/ext/oauth/x509/kid?v= <KID> https://wfsso.pnc.com/pf/JWKS",
+                    "space": {
+                        "name": "Enterprise Identity Technology",
+                        "link": "/spaces/csoteams/overview",
+                        "id": 164462608,
+                        "key": "csoteams"
+                    },
+                    "versionNumber": 5,
+                    "versionBy": {
+                        "displayName": "Peter Choe",
+                        "userKey": "8aaec88c840cbf4001849ab3569000a3",
+                        "username": "PK48943",
+                        "profilePicturePath": "/download/attachments/722482015/user-avatar"
+                    },
+                    "labels": [
+                        {
+                            "prefix": "global",
+                            "name": "apigee-doc",
+                            "id": "207519764"
+                        }
+                    ],
+                    "createdDate": "2023-08-15T10:58:56-04:00",
+                    "createdBy": {
+                        "displayName": "David Fox",
+                        "userKey": "8aa4cf3a7c281f4c017c817e04690053",
+                        "username": "PL33636",
+                        "profilePicturePath": "/download/attachments/366927047/user-avatar"
+                    },
+                    "id": "995666595",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/csoteams/pages/162610542/Enterprise+Identity+Technology",
+                            "id": "162610542",
+                            "type": "page",
+                            "title": "Enterprise Identity Technology"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/252944924/Education+and+Training+Resources",
+                            "id": "252944924",
+                            "type": "page",
+                            "title": "Education and Training Resources"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/252944930/Technical+Documentation",
+                            "id": "252944930",
+                            "type": "page",
+                            "title": "Technical Documentation"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:11:12.4650844+00:00",
+                    "hash": "3fd19fe67b196186"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/introspect.<mark>oauth</mark><mark>2</mark> QA: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> https://wfsso-qa.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://wfsso-qa.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark>",
+                        "PROD: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> https://wfsso.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://wfsso.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark> Workforce CityPlan",
+                        "/authorization.<mark>oauth</mark><mark>2</mark> https://signin-qa.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark> PROD: https://signin.pnc.com/as/<mark>token.oauth2</mark> https://signin.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark>",
+                        "/as/introspect.<mark>oauth</mark><mark>2</mark> PROD: https://wfsso-apps.pnc.com/as/<mark>token.oauth2</mark> https://wfsso-apps.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://wfsso-apps.pnc.com/as",
+                        "/as/introspect.<mark>oauth</mark><mark>2</mark> UAT: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> https://iam-idp-wf-uat.pncint.net/as/authorization.<mark>oauth</mark><mark>2</mark> https://iam-idp-wf-uat.pncint.net"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "647084091",
+                "_score": 299.46118,
+                "_source": {
+                    "versionWhen": "2023-02-15T11:08:51-05:00",
+                    "type": "page",
+                    "title": "DSA - Voyager Inventory Outer Service Client Id And Secret",
+                    "body": "dsa-voy-app RND dc-lbvcj2m9it9pmrviw81cr5n8l Test-QA dc-h5srrv2fownytt5zmha1j9byg Stage-QA MaSZhHOPz2o56S1ijZiXAYtkpQ6cgpGMlIT7vGF84i8yJzggrCZBUlIrsgNBLko4 UAT dc-qzqxpb68mhvjf5mfbavk4d10a Prod-GF1 pwWMJM5PiQjHJ1aNt4avMhaTdb97YB2dZ8yxcA8K6NMe5uCAp0SSlroJRqSawJN2 Prod-GF2 pwWMJM5PiQjHJ1aNt4avMhaTdb97YB2dZ8yxcA8K6NMe5uCAp0SSlroJRqSawJN2 Apigee Environment External Scope URL RND DSA-APIGEE-VOY-INVENTORY-ACCESS https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 Test-QA DSA-APIGEE-VOY-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 Stage-QA DSA-APIGEE-VOY-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 UAT DSA-APIGEE-VOY-INVENTORY-ACCESS https://iam-idp-wf-uat.pncint.net/as/token.oauth2 Prod-GF1 Prod-GF2 dsa-voy-inventory-service Environment External Scope URL RND DSA-INVENTORY-ACCESS https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 Test-QA DSA-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 Stage-QA DSA-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 UAT DSA-INVENTORY-ACCESS https://iam-idp-wf-uat.pncint.net/as/token.oauth2 Prod-GF1 Prod-GF2",
+                    "space": {
+                        "name": "DSA",
+                        "link": "/spaces/DSA/overview",
+                        "id": 141721635,
+                        "key": "DSA"
+                    },
+                    "versionNumber": 6,
+                    "versionBy": {
+                        "displayName": "Praveen Kumar A",
+                        "userKey": "8aa4c5d47be76be8017be9ad098b0002",
+                        "username": "PL75258",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2022-08-26T02:00:35-04:00",
+                    "createdBy": {
+                        "displayName": "Praveen Kumar A",
+                        "userKey": "8aa4c5d47be76be8017be9ad098b0002",
+                        "username": "PL75258",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "647084091",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DSA/pages/141307180/DSA+Home+-+DOT+pnc.com+Sub+Applications+Mnemonic",
+                            "id": "141307180",
+                            "type": "page",
+                            "title": "DSA Home - DOT (pnc.com) Sub Applications Mnemonic"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/153715698/Dev",
+                            "id": "153715698",
+                            "type": "page",
+                            "title": "Dev"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/493362725/DSA-OCP+Apps",
+                            "id": "493362725",
+                            "type": "page",
+                            "title": "DSA-OCP Apps"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/183381846/DSA+Client+Id+and+Client+secret",
+                            "id": "183381846",
+                            "type": "page",
+                            "title": "DSA Client Id and Client secret"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:20:53.6345348+00:00",
+                    "hash": "9b148076e9937b20"
+                },
+                "highlight": {
+                    "body": [
+                        "://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> UAT DSA-INVENTORY-ACCESS https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> Prod-GF1 Prod-GF<mark>2</mark>",
+                        "https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> Stage-QA DSA-APIGEE-VOY-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> UAT DSA-APIGEE-VOY-INVENTORY-ACCESS",
+                        "https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> Test-QA DSA-INVENTORY-ACCESS https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> Stage-QA DSA-INVENTORY-ACCESS https",
+                        "https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> Prod-GF1 Prod-GF<mark>2</mark> dsa-voy-inventory-service Environment External Scope URL RND DSA-INVENTORY-ACCESS",
+                        "Apigee Environment External Scope URL RND DSA-APIGEE-VOY-INVENTORY-ACCESS https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> Test-QA DSA-APIGEE-VOY-INVENTORY-ACCESS"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "953092227",
+                "_score": 298.77246,
+                "_source": {
+                    "versionWhen": "2026-02-27T12:06:19-05:00",
+                    "type": "page",
+                    "title": "Accounts Admin API",
+                    "body": "Endpoint POST /ift/v1/admin/updatePartyId Description This API endpoint will be used by a support team to manually update the partyId in IFT SOR. 2. Endpoint GET /ift/v1/admin/updateEmail Description This API endpoint will be used by a support team to manually update the email in IFT SOR. 3. Endpoint POST /ift/v1/admin/updateEnrollmentStatus Description This API endpoint will be used by a support team to manually trigger the Enrollment indicator update to the DSP 4. Endpoint PUT /ift/v1/admin/relatedParty Description This API endpoint will be used by a support team to manually update the related parties in IFT SOR. 5. Endpoint POST /ift/v1/admin/merchantapplication/sync Description This API endpoint will be used by a support team to manually update Scepter application status in IFT SOR. 6. Endpoint POST /ift/v1/admin/accountInvolvements Description This API endpoint will be used by a support team to manually create account involvements 7. Endpoint DELETE /ift/v1/admin/accountInvolvements/{id} Description This API endpoint will be used by a support team to manually delete account involvements 8. Endpoint POST /ift/v1/admin/app-onboarding-notification/fire Description This API endpoint will be used by a support team to manually fire an app onboarding notification event in case one was missed. 9. Endpoint DELETE /ift/v1/admin/accounts/activations Description This API endpoint will be used by support team to delete an existing device activation. Endpoint POST /ift/v1/admin/updatePartyId Description This API endpoint will be used by a support team to manually update the partyId in IFT SOR. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/payfac-admin-apis-100#/Admin/admin%2FupdatePartyId Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/updatePartyId oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/updatePartyId oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/updatePartyId oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/updatePartyId oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"oldPartyId\":\"P1\", \"newPartyId\":\"P2\", \"workflow\": \"ACCESS_PARTY | RELATED_PARTY\", \"eventTriggeredBy\" :\"PLXXX\", \"eventTriggerReason\" : \"CRXXXX\" } Sample Response 200 OK { \"status\":\"COMPLETE | FAILED | IGNORED\" } 2. Endpoint POST /ift/v1/admin/updateEmail Description This API endpoint will be used by a support team to manually update the email in IFT SOR. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/payfac-admin-apis-100#/Admin/admin%2FupdateEmail Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/updateEmail oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/updateEmail oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/updateEmail oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/updateEmail oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request Header: partyId=1111111111 Body: { \"oldEmail\":\"abc@xyz.com\", \"newEmail\":\"new-abc@xyz.com\", \"workflow\": \"ACCESS_PARTY\", \"eventTriggeredBy\" :\"PLXXX\", \"eventTriggerReason\" : \"CRXXXX\" } Sample Response 200 OK { \"status\":\"COMPLETE | FAILED | IGNORED\" } 3. Endpoint POST /ift/v1/admin/updateEnrollmentStatus Description This API endpoint will be used by a support team to manually trigger the Enrollment indicator update to the DSP. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/payfac-admin-apis-100#/Admin/admin%2FupdateEnrollmentStatus Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/updateEnrollmentStatus oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/updateEnrollmentStatus oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/updateEnrollmentStatus oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/updateEnrollmentStatus oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request Header: partyId=1111111111 Body: { } Sample Response 200 OK { \"status\":\"OK| FAILED | IGNORED\" } 4. Endpoint PUT /ift/v1/admin/relatedParty Description This API endpoint will be used by a support team to manually update the related parties in IFT SOR. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/payfac-admin-apis-100#/Admin/admin%2FrelatedParty Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/relatedParty oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/relatedParty oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/relatedParty oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/relatedParty oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request Header: merchantId=4444444444 Body: { \"partyId\": 1725045169, \"name\": 1725045169, \"business\": true, \"businessOwner\": false, \"solePropBusiness\": false, \"controllingParty\": true, \"percentOwnership\": \"50\", \"eventTriggeredBy\": \"me\", \"eventTriggerReason\": \"none\" } Sample Response 200 OK { \"status\":\"OK | FAILED \" } 5. Endpoint POST /ift/v1/admin/merchantapplication/sync Description This API endpoint will be used by a support team to manually sync the IFT application status with Scepter application status. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/payfac-admin-apis-100#/Admin/admin /merchantapplication/sync Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/m erchantapplication/sync oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/merchantapplication/sync oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/merchantapplication/sync oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/merchantapplication/sync oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"appId\": string } Sample Response 200 OK { \"status\":\"OK| FAILED | IGNORED\" } 6. Endpoint POST /ift/v1/admin/accountInvolvements Description This API endpoint will be used by a support team to manually create account involvements Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/Payfac%20Admin%20APIs%201.0.0#/admin-controller/createAccountInvolvements Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/accountInvolvements oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/accountInvolvements oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/accountInvolvements oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/accountInvolvements oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request Header: merchantId=4444444444 Body: { \"partyId\": \"p7719559\", \"mdmContractIdentifier\": \"mdmContractId\", \"c2pCode\": \"c2pCode\", \"partyType\": \"P\", \"eventTriggeredBy\" :\"PLXXX\" \"eventTriggerReason\" : \"INCXXXX\" } Sample Response 200 OK { \"status\":\"COMPLETE| FAILED\" } 7. Endpoint DELETE /ift/v1/admin/accountInvolvements/{id} Description This API endpoint will be used by a support team to manually delete account involvements Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/Payfac%20Admin%20APIs%201.0.0#/admin-controller/deleteAccountInvolvements Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/accountInvolvements /{id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/accountInvolvements/{id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/accountInvolvements/{id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/accountInvolvements/{id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request Header: merchantId=4444444444 Body: { \"eventTriggeredBy\" :\"PLXXX\" \"eventTriggerReason\" : \"INCXXXX\" } Sample Response 200 OK { \"status\":\"COMPLETE| FAILED\" } 8. Endpoint POST /ift/v1/admin/app-onboarding-notification/fire Description This API endpoint will be used by a support team to manually fire an app onboarding notification event in case one was missed. Swagger Documentation Internal Developer Portal - https://developer-wpi-qa.pncint.net/content/Payfac%20Admin%20APIs%201.0.0#/Admin/post_admin_app_onboarding_notification_fire Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/app-onboarding-notification/fire oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/app-onboarding-notification/fire oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/app-onboarding-notification/fire oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/app-onboarding-notification/fire oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"appId\": \"POR-123498JK\", \"eventTriggeredBy\": \"PL12345\", \"eventTriggerReason\": \"CR12345\" } Sample Response 200 OK { \"status\":\"COMPLETE\" } 9. Endpoint DELETE /ift/v1/admin/accounts/activations Description This API will be used by support team to delete an existing sdkActivation from the database. On this API the merchantId, partyId and sdkActivationDevice are mandatory. Swagger Documentation Internal Developer Portal - Payfac Admin APIs 1.0.0 | Internal Developer Portal DeleteSdkActivation.postman_collection.json.txt Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/ accounts/activations oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/accounts/activations oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 API Product CIB_IFT_Admin Sample Request Headers: Header name Required Description partyId Required MDM party Id merchantId Required MID sdkActivationDevice Required Sdk Activation Device Number Sample Response Response 200 OK { \"status\":\"COMPLETE | FAILED | IGNORED\" }",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 34,
+                    "versionBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2023-06-28T02:22:28-04:00",
+                    "createdBy": {
+                        "displayName": "Shashank Khati",
+                        "userKey": "8aa4c5d37c281f33017c9e69ee0d0071",
+                        "username": "PL32430",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "953092227",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/953109353/Payfac+Admin+APIs",
+                            "id": "953109353",
+                            "type": "page",
+                            "title": "Payfac Admin APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T06:59:47.792598+00:00",
+                    "hash": "67394e39866ad8e7"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/updatePartyId <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark>",
+                        "/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/updateEmail <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark>",
+                        "<mark>token.oauth2</mark> QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/updateEnrollmentStatus <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD",
+                        "/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/relatedParty <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark>",
+                        "/wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/accountInvolvements <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark>"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1537917633",
+                "_score": 298.71573,
+                "_source": {
+                    "versionWhen": "2026-02-09T12:56:23-05:00",
+                    "type": "page",
+                    "title": "Feature Flag API",
+                    "body": "Endpoint POST /ift/v1/admin/featureFlagConfigs Description This API endpoint will be used by a support team to manually create Feature Flag Configs in the IFT SOR. 2. Endpoint PATCH /ift/v1/admin/featureFlagConfigs/{feature_id} Description This API endpoint will be used by a support team to manually update Feature Flag Configs in the IFT SOR. 3. Endpoint DELETE /ift/v1/admin/featureFlagConfigs/{feature_id} Description This API endpoint will be used by a support team to manually delete Feature Flag Configs in the IFT SOR. 4. Endpoint PATCH /ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} Description This API endpoint will be used by a support team to manually update individual rules of Feature Flag Configs in the IFT SOR. 5. Endpoint PUT /ift/v1/admin/featureFlagConfigs/{feature_id}/rules Description This API endpoint will be used by a support team to manually add/replace individual rules of Feature Flag Configs in the IFT SOR. 6. Endpoint DELETE /ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} Description This API endpoint will be used by a support team to manually delete individual rules of Feature Flag Configs in the IFT SOR. Endpoint POST /ift/v1/admin/featureFlagConfigs Description This API endpoint will be used by a support team to manually create Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"featureId\": \"FEATURE_ID\", \"isFeatureActive\": false, \"rules\": [ { \"ruleId\": \"RULE_ID\", \"ruleType\": \"LAMBDA\", \"isRuleActive\": false } ], \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 201 CREATED 2. Endpoint PATCH /ift/v1/admin/featureFlagConfigs/{feature_id} Description This API endpoint will be used by a support team to manually update Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"isFeatureActive\": false, \"rules\": [ { \"ruleId\": \"RULE_ID\", \"ruleType\": \"LAMBDA\", \"isRuleActive\": false } ], \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 204 NO CONTENT 3. Endpoint DELETE /ift/v1/admin/featureFlagConfigs/{feature_id} Description This API endpoint will be used by a support team to manually delete Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 204 NO CONTENT 4. Endpoint PATCH /ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} Description This API endpoint will be used by a support team to manually update individual rules of Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"ruleType\": \"LAMBDA\", \"isRuleActive\": false, \"order\": 1, \"whitelist\": [\"val1\"], \"blacklist\": [\"val2\"], \"isArgumentSensitive\": true, \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 204 NO CONTENT 5. Endpoint PUT /ift/v1/admin/featureFlagConfigs/{feature_id}/rules Description This API endpoint will be used by a support team to manually add/replace individual rules of Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"ruleId\": \"RULE_ID\", \"ruleType\": \"LAMBDA\", \"isRuleActive\": false, \"order\": 1, \"whitelist\": [\"val1\"], \"blacklist\": [\"val2\"], \"isArgumentSensitive\": true, \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 201 CREATED | 204 NO CONTENT 6. Endpoint DELETE /ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} Description This API endpoint will be used by a support team to manually delete individual rules of Feature Flag Configs in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Feature Flag Config Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id}/rules/{rule_id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 204 NO CONTENT",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 10,
+                    "versionBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2024-12-11T17:46:30-05:00",
+                    "createdBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1537917633",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/953109353/Payfac+Admin+APIs",
+                            "id": "953109353",
+                            "type": "page",
+                            "title": "Payfac Admin APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:00:19.0750126+00:00",
+                    "hash": "eb47fe589a311131"
+                },
+                "highlight": {
+                    "body": [
+                        "wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark>",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/featureFlagConfigs <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url",
+                        "-<mark>token</mark>-url: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url",
+                        "-<mark>token</mark>-url: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/featureFlagConfigs/{feature_id} <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url",
+                        ": https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/featureFlagConfigs <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1592252559",
+                "_score": 297.77112,
+                "_source": {
+                    "versionWhen": "2025-02-06T13:31:43-05:00",
+                    "type": "page",
+                    "title": "Swagger Publish-Token Url change in External APIGEE Proxy Repo",
+                    "body": "Due to recent Micron compliance rule, DPP team is migrating DPP swagger publish API used in external APIGEE proxies from Ping CST authentication to Ping workforce authentication. Because of this, below changes needs to be done in the respective product's APIGEE proxy CI repo for DPP Swagger Publish Token Gen url. CI Repo changes For RND env: Open src/dpp-swagger-publish/publish/rnd/contract.json and change authzConfig.token.uri from [\"https://signin-rnd.pnc.com/as/token.oauth2 \"] to [\"https://wfsso-rnd.pnc.com/as/token.oauth2 \"] For QA env: Open src/dpp-swagger-publish/publish/qa/contract.json and change authzConfig.token.uri from [\"https://signin-qa.pnc.com/as/token.oauth2 \"] to [\"https://wfsso-qa.pnc.com/as/token.oauth2 \"] For POSTQA env: Open src/dpp-swagger-publish/publish/postqa/contract.json and change authzConfig.token.uri from [\"https://signin-qa.pnc.com/as/token.oauth2 \"] to [\"https://wfsso-qa.pnc.com/as/token.oauth2 \"] For PROD env: Open src/dpp-swagger-publish/publish/prod/contract.json and change authzConfig.token.uri from [\"https://signin.pnc.com/as/token.oauth2 \"] to [\"https://wfsso.pnc.com/as/token.oauth2 \"] Please refer to the below repo for sample changes. https://git.pncint.net/projects/DPP/repos/dpp-health-check-proxy/pull-requests/22/diff#src/dpp-swagger-publish/publish/rnd/contract.json No changes are required on CD Repo side. After making above changes, make sure CD pipelines run successfully without any error in dpp-swagger-publish step. Only Token generation url needs to be changed from proxy repo. No changes are required in proxy repo to change client_id and client_secret. DPP team is going to make Devops support request per env like below for Devops team to update these client_id and client_secret values in the Jenkins pipeline variables. https://jira.pncint.net/servicedesk/customer/portal/1/HELP-2571 Timeline of when these changes will be effective in each environment RND : QA : Postqa, Prod :",
+                    "space": {
+                        "name": "DPP - Developer Portal Platform",
+                        "link": "/spaces/DDPP/overview",
+                        "id": 77987847,
+                        "key": "DDPP"
+                    },
+                    "versionNumber": 12,
+                    "versionBy": {
+                        "displayName": "Bhaskar Vasupalli",
+                        "userKey": "8aaec50474e3283b0174ff8b1aa9001e",
+                        "username": "PL60452",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [
+                        {
+                            "prefix": "global",
+                            "name": "unrestored-unknown-attachment",
+                            "id": "356483092"
+                        }
+                    ],
+                    "createdDate": "2025-02-04T14:59:58-05:00",
+                    "createdBy": {
+                        "displayName": "Bhaskar Vasupalli",
+                        "userKey": "8aaec50474e3283b0174ff8b1aa9001e",
+                        "username": "PL60452",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1592252559",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DDPP/pages/76779093/DPP+-+Developer+Portal+Platform",
+                            "id": "76779093",
+                            "type": "page",
+                            "title": "DPP - Developer Portal Platform"
+                        },
+                        {
+                            "link": "/spaces/DDPP/pages/757833369/Developer+Centric",
+                            "id": "757833369",
+                            "type": "page",
+                            "title": "Developer Centric"
+                        },
+                        {
+                            "link": "/spaces/DDPP/pages/886388001/Documentation",
+                            "id": "886388001",
+                            "type": "page",
+                            "title": "Documentation"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:08:28.5648573+00:00",
+                    "hash": "327707b501c0f179"
+                },
+                "highlight": {
+                    "title": [
+                        "Swagger Publish-<mark>Token</mark> Url change in External APIGEE Proxy Repo"
+                    ],
+                    "body": [
+                        "/postqa/contract.json and change authzConfig.<mark>token</mark>.uri from [\"https://signin-qa.pnc.com/as/<mark>token.oauth2</mark> \"] to [\"https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark>",
+                        "as/<mark>token.oauth2</mark> \"] to [\"https://wfsso-rnd.pnc.com/as/<mark>token.oauth2</mark> \"] For QA env: Open src/dpp-swagger-publish/publish/qa/contract.json and change authzConfig.<mark>token</mark>.uri",
+                        "from [\"https://signin-qa.pnc.com/as/<mark>token.oauth2</mark> \"] to [\"https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> \"] For POSTQA env: Open src/dpp-swagger-publish/publish",
+                        "\"] For PROD env: Open src/dpp-swagger-publish/publish/prod/contract.json and change authzConfig.<mark>token</mark>.uri from [\"https://signin.pnc.com/as/<mark>token.oauth2</mark>",
+                        "\"] to [\"https://wfsso.pnc.com/as/<mark>token.oauth2</mark> \"] Please refer to the below repo for sample changes. https://git.pncint.net/projects/DPP/repos/dpp-health-check-proxy"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "927956856",
+                "_score": 295.64874,
+                "_source": {
+                    "versionWhen": "2023-11-28T10:05:16-05:00",
+                    "type": "page",
+                    "title": "Tax Rates API",
+                    "body": "Endpoint POST /ift/v1/settings/tax-rates Description This API endpoint will be used to create a new tax item for Payfac account in IFT SOR. 2. Endpoint GET /ift/v1/settings/tax-rates Description This API endpoint will be used to retrieve all tax item for Payfac account. 3. Endpoint PUT /ift/v1/settings/tax-rates/<taxRateId> Description This API endpoint will be used to update an existing tax item for Payfac account. 4. Endpoint DELETE /ift/v1/settings/tax-rates/<taxRateId> Description This API endpoint will be used to delete an existing tax item for Payfac account. Endpoint POST /ift/v1/settings/tax-rates Description This API endpoint will be used to create a new tax item for Payfac account in IFT SOR. Important Notes - Max three items are allowed per Payfac account Only one tax item can be default. Adding a new tax-item as default will disable default flag on existing tax item (if any). Swagger Documentation Internal Developer Portal - https://developer-wpi-rnd.pncint.net/content/payfac-settings-apis-100#/tax-rates Postman Collection IFT APIs.postman_collection.json.txt Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID { \"taxLabel\":\"State\", \"taxRate\":8.0, \"default\":true } Sample Response 201 Created { \"taxRateId\":\"r1\", \"taxLabel\":\"State\", \"taxRate\":8.0, \"default\":true } 2. Endpoint GET /ift/v1/settings/tax-rates Description This API endpoint will be used to retrieve all tax item for Payfac account. Swagger Documentation Internal Developer Portal - https://developer-wpi-rnd.pncint.net/content/payfac-settings-apis-100#/tax-rates Postman Collection Refer top endpoint Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID Sample Response 200 OK [ { \"taxRateId\":\"r1\", \"taxLabel\":\"State\", \"taxRate\":8.0, \"default\":true }, { \"taxRateId\":\"r2\", \"taxLabel\":\"Food\", \"taxRate\":10.0, \"default\":false }, { \"taxRateId\":\"r3\", \"taxLabel\":\"Alcohol\", \"taxRate\":18.0, \"default\":false } ] 3. Endpoint PUT /ift/v1/settings/tax-rates/<taxRateId> Description This API endpoint will be used to update an existing tax item for Payfac account. Swagger Documentation Internal Developer Portal - https://developer-wpi-rnd.pncint.net/content/payfac-settings-apis-100#/tax-rates Postman Collection Refer top endpoint Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID { \"taxLabel\":\"State\", \"taxRate\":10.0, \"default\":false } Sample Response 200 OK { \"taxRateId\":\"r1\", \"taxLabel\":\"State\", \"taxRate\":10.0, \"default\":false } 4. Endpoint DELETE /ift/v1/settings/tax-rates/<taxRateId> Description This API endpoint will be used to delete an existing tax item for Payfac account. Swagger Documentation Internal Developer Portal - https://developer-wpi-rnd.pncint.net/content/payfac-settings-apis-100#/tax-rates Postman Collection Refer top endpoint Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID Sample Response 200 OK { \"successful\":true }",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 10,
+                    "versionBy": {
+                        "displayName": "Shashank Khati",
+                        "userKey": "8aa4c5d37c281f33017c9e69ee0d0071",
+                        "username": "PL32430",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2023-06-20T13:03:31-04:00",
+                    "createdBy": {
+                        "displayName": "Shashank Khati",
+                        "userKey": "8aa4c5d37c281f33017c9e69ee0d0071",
+                        "username": "PL32430",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "927956856",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/953109351/Payfac+Settings+APIs",
+                            "id": "953109351",
+                            "type": "page",
+                            "title": "Payfac Settings APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:16:15.5985512+00:00",
+                    "hash": "eb47fe589a311131"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tax-rates <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tax-rates <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1371782548",
+                "_score": 295.41226,
+                "_source": {
+                    "versionWhen": "2024-08-01T09:54:29-04:00",
+                    "type": "page",
+                    "title": "BCC Pre check Integration details",
+                    "body": "Employee Check Rata Inflight Duplicate check / Recently Decisioned RegW RegO Address Check CVU GeoCode Ofac API Authentication details API Environment API Environment Authentication URL Auth Details Employee Check DEV RND https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id: dc-3fqkkpz8h4u57cmqetl0rufny UAT UAT https://iam-idp-wf-uat.pncint.net/as/token.oauth2 client-id: dc-ojjyzmpftjbpxj9r1ory08zu4 QA QA https://wfsso-qa.pnc.com/as/token.oauth2 client-id: dc-9n5k7wusc027yk1e9h8l1ghxp Rata Check DEV RND https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id: dc-jmyxrqtocr86yxs1itv7gpp61 UAT UAT https://iam-idp-wf-uat.pncint.net/as/token.oauth2 client-id: dc-1403uukfp9z53zjgegwt0favw QA QA https://wfsso-qa.pnc.com/as/token.oauth2 client-id: dc-4i9ayv83smrujrzyezethxibk Inflight Check DEV RND1, RND2 https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 scope: sys:som-mozart:invoke:all UAT UAT1, UAT2 https://iam-idp-wf-uat.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 scope: sys:som-mozart:invoke:all QA QA1, QA2 https://wfsso-qa.pnc.com/as/token.oauth2 client-id: rtl_i00400_som_02 scope: sys:som-mozart:invoke:all RegW Check DEV/UAT/QA RND/UAT/QA https://wfsso-qa.pnc.com/as/token.oauth2 client-id: scope: sys:som-mozart:invoke:all RegO Check DEV/UAT/QA RND/UAT/QA https://wfsso-qa.pnc.com/as/token.oauth2 client-id: scope: sys:som-mozart:invoke:all Address Check DEV/UAT/QA RND/UAT/QA https://wfsso-qa.pnc.com/as/token.oauth2 client-id: rtl_i00400_lop_01 scope: ping-cvv-spectrum-address-cleansing-inner Environment for BCC API Environment API Environment API URL Virtual Hi- Jak URL Notes Employee Check DEV RND https://api-gw-rnd.pncint.net/lop/apifw/employeecheck/v1/employee/check UAT UAT https://api-gw-uat.pncint.net/lop/apifw/employeecheck/v1/employee/check QA QA https://api-gw-qa.pncint.net/lop/apifw/employeecheck/v1/employee/check Rata Check DEV RND https://api-gw-rnd.pncint.net/som/geocode/v1/fetch UAT UAT https://api-gw-uat.pncint.net/som/geocode/v1/fetch QA QA https://api-gw-qa.pncint.net/som/geocode/v1/fetch Inflight Check DEV RND1 https://som-origination-orchestration-api-som-rnd1.apps.gp2-ocp4-rnd.pncint.net/originations-platform/orchestration/v1/inflight-check UAT UAT1 https://som-origination-orchestration-api-som-uat1.apps.gp2-ocp4-uat.pncint.net/originations-platform/orchestration/v1/inflight-check QA QA1 https://som-origination-orchestration-api-som-qa1.apps.gp2-ocp4-qa.pncint.net/originations-platform/orchestration/v1/inflight-check DEV RND2 https://som-origination-orchestration-api-som-rnd2.apps.ocp4-rnd.pncint.net/originations-platform/orchestration/v1/inflight-check UAT UAT2 https://som-origination-orchestration-api-som-uat2.apps.ocp4-uat.pncint.net/originations-platform/orchestration/v1/inflight-check QA QA2 https://som-origination-orchestration-api-som-qa2.apps.ocp4-qa.pncint.net/originations-platform/orchestration/v1/inflight-check RegW Check DEV/UAT/QA RND/UAT/QA https://mozart-core-api-som-qa1.apps.gp2-ocp4-qa.pncint.net/api/reference-data/v1/filter-collections/som-bcc-reg-w-info/data RegO Check DEV/UAT/QA RND/UAT/QA https://mozart-core-api-som-qa1.apps.gp2-ocp4-qa.pncint.net/api/reference-data/v1/filter-collections/rego-executives/data Address Check DEV/UAT/QA RND/UAT/QA https://cvv-spectrum-address-cleansing-inner-cvv-qa.apps.retail-ocp4-qa.pncint.net/location-directory-entry/location/addressorgeocode/evaluation Mozart App Settings https://mozart-qa.pncint.net/app-settings QA Resources Document Type Resource Postman Collection",
+                    "space": {
+                        "name": "Symphony Lending Platform - SOM",
+                        "link": "/spaces/SOM/overview",
+                        "id": 707133448,
+                        "key": "SOM"
+                    },
+                    "versionNumber": 4,
+                    "versionBy": {
+                        "displayName": "Celestial Goldsmith",
+                        "userKey": "8aa4c5d37393e9220173b9fc416c0033",
+                        "username": "PL17614",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2024-07-22T16:39:44-04:00",
+                    "createdBy": {
+                        "displayName": "Sachin Keshari",
+                        "userKey": "8aaec50483a18eaf0183ed12872e0065",
+                        "username": "PK45585",
+                        "profilePicturePath": "/download/attachments/685401412/user-avatar"
+                    },
+                    "id": "1371782548",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/SOM/pages/703673911/SOM+Home",
+                            "id": "703673911",
+                            "type": "page",
+                            "title": "SOM Home"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/979825671/Teams",
+                            "id": "979825671",
+                            "type": "page",
+                            "title": "Teams"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/952893417/Phoenix+Flames",
+                            "id": "952893417",
+                            "type": "page",
+                            "title": "Phoenix Flames"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/1262698006/Technology+Delivery+BCC",
+                            "id": "1262698006",
+                            "type": "page",
+                            "title": "Technology & Delivery (BCC)"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:11:49.0623412+00:00",
+                    "hash": "abfd965fa12f108b"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> client-id: dc-4i9ayv83smrujrzyezethxibk Inflight Check DEV RND1, RND<mark>2</mark> https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> client-id: rtl_i00400",
+                        "//wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> client-id: dc-9n5k7wusc027yk1e9h8l1ghxp Rata Check DEV RND https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> client-id",
+                        "as/<mark>token.oauth2</mark> client-id: scope: sys:som-mozart:invoke:all Address Check DEV/UAT/QA RND/UAT/QA https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> client-id: rtl_i00400",
+                        ":invoke:all QA QA1, QA<mark>2</mark> https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> client-id: rtl_i00400_som_02 scope: sys:som-mozart:invoke:all RegW Check DEV/UAT/QA RND",
+                        "_som_02 scope: sys:som-mozart:invoke:all UAT UAT1, UAT<mark>2</mark> https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> client-id: rtl_i00400_som_02 scope: sys:som-mozart"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "494374039",
+                "_score": 295.00003,
+                "_source": {
+                    "versionWhen": "2022-03-22T10:29:19-04:00",
+                    "type": "page",
+                    "title": "Access Token URL's",
+                    "body": "IN ORDER FROM RND To Production: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 https://iam-idp-wf-uat.pncint.net/as/token.oauth2 https://wfsso-qa.pnc.com/as/token.oauth2 https://wfsso.pnc.com/as/token.oauth2 Related articles Related issues",
+                    "space": {
+                        "name": "Enterprise Identity Technology",
+                        "link": "/spaces/csoteams/overview",
+                        "id": 164462608,
+                        "key": "csoteams"
+                    },
+                    "versionNumber": 1,
+                    "versionBy": {
+                        "displayName": "Steven Loy",
+                        "userKey": "8aa4c5d5711a28420171c6ec7bc7010e",
+                        "username": "PP07525",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [
+                        {
+                            "name": "kb-how-to-article",
+                            "id": "6422541",
+                            "prefix": "global"
+                        }
+                    ],
+                    "createdDate": "2022-03-22T10:27:46-04:00",
+                    "createdBy": {
+                        "displayName": "Steven Loy",
+                        "userKey": "8aa4c5d5711a28420171c6ec7bc7010e",
+                        "username": "PP07525",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "494374039",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/csoteams/pages/162610542/Enterprise+Identity+Technology",
+                            "id": "162610542",
+                            "type": "page",
+                            "title": "Enterprise Identity Technology"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/260224183/Enterprise+Identity+Engineering+-+Integration",
+                            "id": "260224183",
+                            "type": "page",
+                            "title": "*Enterprise Identity Engineering - Integration"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/169058120/Integration+-+How-to+articles",
+                            "id": "169058120",
+                            "type": "page",
+                            "title": "Integration - How-to articles"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:25:10.5921833+00:00",
+                    "hash": "2025c67fb0f7d358"
+                },
+                "highlight": {
+                    "title": [
+                        "Access <mark>Token</mark> URL's"
+                    ],
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Related articles Related issues",
+                        "IN ORDER FROM RND To Production: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> https://wfsso-qa.pnc.com"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1873892193",
+                "_score": 292.86832,
+                "_source": {
+                    "versionWhen": "2025-08-05T11:59:35-04:00",
+                    "type": "page",
+                    "title": "Resume Point API",
+                    "body": "1. Endpoint PUT /ift/v1/admin/resumePoints Description This API endpoint will be used by a support team to manually set the resume point of a changestream in the IFT SOR. 2. Endpoint DELETE /ift/v1/admin/resumePoints/{changestream_id} Description This API endpoint will be used by a support team to manually delete the resume point of a changestream in the IFT SOR. 1. Endpoint PUT /ift/v1/admin/resumePoints Description This API endpoint will be used by a support team to manually set the resume point of a changestream in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Resume Point Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/resumePoints oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/resumePoints oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/resumePoints oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/resumePoints oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"changestreamId\": \"CHANGESTREAM_ID\", \"resumeToken\": \"RESUME_TOKEN\", \"resumeTimestamp\": \"2025-01-01T00:00:00Z\", \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 201 CREATED | 204 NO CONTENT 2. Endpoint DELETE /ift/v1/admin/resumePoints/{changestream_id} Description This API endpoint will be used by a support team to manually delete the resume point of a changestream in the IFT SOR. Swagger Documentation Internal Developer Portal Postman Collection Resume Point Admin APIs.postman_collection.json Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/admin/resumePoints/{changestream_id} oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/resumePoints/{changestream_id} oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/resumePoints/{changestream_id} oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/admin/resumePoints/{changestream_id} oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Admin Sample Request { \"eventTriggeredBy\": \"PLxxx\", \"eventTriggerReason\": \"INCxxx\" } Sample Response 204 NO CONTENT",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 1,
+                    "versionBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2025-08-05T11:49:58-04:00",
+                    "createdBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1873892193",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/953109353/Payfac+Admin+APIs",
+                            "id": "953109353",
+                            "type": "page",
+                            "title": "Payfac Admin APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:04:39.1247361+00:00",
+                    "hash": "2025c67fb0f7d358"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/resumePoints <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/admin/resumePoints <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https",
+                        "-<mark>token</mark>-url: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/admin/resumePoints/{changestream_id} <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url",
+                        "://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/resumePoints <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso-qa.pnc.com",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA api-url: https://api-gw-qa.pncint.net/ift/v1/admin/resumePoints/{changestream_id} <mark>oauth</mark><mark>2</mark>"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "927956860",
+                "_score": 292.52954,
+                "_source": {
+                    "versionWhen": "2025-07-01T17:23:56-04:00",
+                    "type": "page",
+                    "title": "Tipping Settings API",
+                    "body": "Endpoint GET /ift/v1/settings/tipping Description This API endpoint will be used to retrieve current tipping settings for a Payfac account from IFT SOR. 2. Endpoint PATCH /ift/v1/settings/tipping Description This API endpoint will be used to update tipping setting for a Payfac account in IFT SOR. Endpoint GET /ift/v1/settings/tipping Description This API endpoint will be used to retrieve current tipping settings for a Payfac account from IFT SOR. Important Notes - It will return default tipping percentages (15%,18%,20%) if not explicitly updated by customer. Swagger Documentation Internal Developer Portal - T BD Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID Sample Response 200 OK { \"tippingEnabled\": true, \"tippingPercentages\":[15,18,20] } 2. Endpoint PATCH /ift/v1/settings/tipping Description This API endpoint will be used to update tipping setting for a Payfac account in IFT SOR. Important Notes - It can be used to update tippingEnabled or tippingPercentages individually or both at same time. Swagger Documentation Internal Developer Portal - T BD Postman Collection TBD Hosting APIGEE URLs RND api-url: https://api-gw-rnd.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tipping oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 Client Onboarding Internal Developer Portal API Product CIB_IFT_Settings Sample Request Headers Header name Required Description partyId Required MDM party Id merchantId Required MID { \"tippingEnabled\": true, \"tippingPercentages\":[15,18,25] } Sample Response 200 OK { \"tippingEnabled\": true, \"tippingPercentages\":[15,18,25] }",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 10,
+                    "versionBy": {
+                        "displayName": "Mrudula Kadam",
+                        "userKey": "8a862da98dc9a974018e0f022c59003f",
+                        "username": "PJ08615",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2023-06-20T13:03:58-04:00",
+                    "createdBy": {
+                        "displayName": "Shashank Khati",
+                        "userKey": "8aa4c5d37c281f33017c9e69ee0d0071",
+                        "username": "PL32430",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "927956860",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/953109351/Payfac+Settings+APIs",
+                            "id": "953109351",
+                            "type": "page",
+                            "title": "Payfac Settings APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:05:24.3739805+00:00",
+                    "hash": "eb47fe589a311131"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tipping <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "/as/<mark>token.oauth2</mark> PROD api-url: https://api-gw.pncint.net/ift/v1/settings/tipping <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Client Onboarding",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tipping <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https",
+                        "-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT api-url: https://api-gw-uat.pncint.net/ift/v1/settings/tipping <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https",
+                        "://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA api-url: https://api-gw-qa.pncint.net/ift/v1/settings/tipping <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso-qa.pnc.com"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "838382015",
+                "_score": 291.82007,
+                "_source": {
+                    "versionWhen": "2024-11-08T13:09:11-05:00",
+                    "type": "page",
+                    "title": "Ping URLs for Users",
+                    "body": "Below URLs are mainly used by the consumer or application team. The .well-known/openid-configuration endpoint contains many endpoints within and used in OIDC configurations. the pf/heartbeat.ping endpoint is used to verify the health/status of PingFederate Ping and associated services are monitored via Dynatrace - ETS CIO - Digital Identity - SRC Overview WorkForce URLs Legacy WorkForce PingFederate WorkForce Apps PingFederate WorkForce Tools PingFederate RND https://iam-idp-wf-rnd.pncint.net/.well-known/openid-configuration https://iam-idp-wf-rnd.pncint.net/pf/heartbeat.ping https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 https://iam-idp-wf-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-wf-rnd.pncint.net/as/introspect.oauth2 https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration https://wfsso-apps-rnd.pnc.com/pf/heartbeat.ping https://wfsso-apps-rnd.pncint.net/as/token.oauth2 https://wfsso-apps-rnd.pncint.net/as/authorization.oauth2 https://wfsso-apps-rnd.pncint.net/as/introspect.oauth2 https://wfsso-tools-rnd.pnc.com/.well-known/openid-configuration https://wfsso-tools-rnd.pnc.com/pf/heartbeat.ping UAT https://iam-idp-wf-uat.pncint.net/.well-known/openid-configuration https://iam-idp-wf-uat.pncint.net/pf/heartbeat.ping https://iam-idp-wf-uat.pncint.net/as/token.oauth2 https://iam-idp-wf-uat.pncint.net/as/authorization.oauth2 https://iam-idp-wf-uat.pncint.net/as/introspect.oauth2 https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration https://wfsso-apps-uat.pnc.com/pf/heartbeat.ping https://wfsso-apps-uat.pncint.net/as/token.oauth2 https://wfsso-apps-uat.pncint.net/as/authorization.oauth2 https://wfsso-apps-uat.pncint.net/as/introspect.oauth2 https://wfsso-tools-uat.pnc.com/.well-known/openid-configuration https://wfsso-tools-uat.pnc.com/pf/heartbeat.ping QA https://wfsso-qa.pnc.com/.well-known/openid-configuration https://wfsso-qa.pnc.com/pf/heartbeat.ping https://wfsso-qa.pnc.com/as/token.oauth2 https://wfsso-qa.pnc.com/as/authorization.oauth2 https://wfsso-qa.pnc.com/as/introspect.oauth2 https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration https://wfsso-apps-qa.pnc.com/pf/heartbeat.ping https://wfsso-apps-qa.pnc.com/as/token.oauth2 https://wfsso-apps-qa.pnc.com/as/authorization.oauth2 https://wfsso-apps-qa.pnc.com/as/introspect.oauth2 https://wfsso-tools-qa.pnc.com/.well-known/openid-configuration https://wfsso-tools-qa.pnc.com/pf/heartbeat.ping PROD https://wfsso.pnc.com/.well-known/openid-configuration https://wfsso.pnc.com/pf/heartbeat.ping https://wfsso.pnc.com/as/token.oauth2 https://wfsso.pnc.com/as/authorization.oauth2 https://wfsso.pnc.com/as/introspect.oauth2 https://wfsso-apps.pnc.com/.well-known/openid-configuration https://wfsso-apps.pnc.com/pf/heartbeat.ping https://wfsso-apps.pnc.com/as/token.oauth2 https://wfsso-apps.pnc.com/as/authorization.oauth2 https://wfsso-apps.pnc.com/as/introspect.oauth2 https://wfsso-tools.pnc.com/.well-known/openid-configuration https://wfsso-tools.pnc.com/pf/heartbeat.ping Customer URLs CST PingFederate AAC PingFederate CST2 Pingfederate RND https://signin-rnd.pnc.com/.well-known/openid-configuration https://signin-rnd.pnc.com/pf/heartbeat.ping https://iam-idp-cst-rnd.pncint.net/as/token.oauth2 https://iam-idp-cst-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-cst-rnd.pncint.net/as/introspect.oauth2 https://iam-mbl-rnd.pncint.net/.well-known/openid-configuration https://iam-mbl-rnd.pncint.net/pf/heartbeat.ping https://iam-mbl-rnd.pncint.net/as/token.oauth2 https://iam-mbl-rnd.pncint.net/as/authorization.oauth2 https://iam-mbl-rnd.pncint.net/as/introspect.oauth2 UAT https://signin-uat.pnc.com/.well-known/openid-configuration https://signin-uat.pnc.com/pf/heartbeat.ping https://iam-idp-cst-uat.pncint.net/as/token.oauth2 https://iam-idp-cst-uat.pncint.net/as/authorization.oauth2 https://iam-idp-cst-uat.pncint.net/as/introspect.oauth2 https://iam-mbl-uat.pncint.net/.well-known/openid-configuration https://iam-mbl-uat.pncint.net/pf/heartbeat.ping https://iam-mbl-uat.pncint.net/as/token.oauth2 https://iam-mbl-uat.pncint.net/as/authorization.oauth2 https://iam-mbl-uat.pncint.net/as/introspect.oauth2 QA https://signin-qa.pnc.com/.well-known/openid-configuration https://signin-qa.pnc.com/pf/heartbeat.ping https://signin-qa.pnc.com/as/token.oauth2 https://signin-qa.pnc.com/as/authorization.oauth2 https://signin-qa.pnc.com/as/introspect.oauth2 https://auth-qa.pnc.com/.well-known/openid-configuration https://auth-qa.pnc.com/pf/heartbeat.ping https://iam-mbl-qa.pncint.net/.well-known/openid-configuration https://iam-mbl-qa.pncint.net/pf/heartbeat.ping https://iam-mbl-qa.pncint.net/as/token.oauth2 https://iam-mbl-qa.pncint.net/as/authorization.oauth2 https://iam-mbl-qa.pncint.net/as/introspect.oauth2 PROD https://signin.pnc.com/.well-known/openid-configuration https://signin.pnc.com/pf/heartbeat.ping https://signin.pnc.com/as/token.oauth2 https://signin.pnc.com/as/authorization.oauth2 https://signin.pnc.com/as/introspect.oauth2 https://auth.pnc.com/.well-known/openid-configuration https://auth.pnc.com/pf/heartbeat.ping https://iam-mbl.pncint.net/.well-known/openid-configuration https://iam-mbl.pncint.net/pf/heartbeat.ping https://iam-mbl.pncint.net/ext/mbl/oauth/jwks JWKS urls WF apps WF legacy CST legacy RND - https://wfsso-apps-rnd.pncint.net/pf/JWKS UAT - https://wfsso-apps-uat.pncint.net/pf/JWKS QA - https://wfsso-apps-qa.pnc.com/pf/JWKS PROD - https://wfsso-apps.pnc.com/pf/JWKS RND - https://iam-idp-wf-rnd.pncint.net/pf/JWKS UAT - https://iam-idp-wf-uat.pncint.net/pf/JWKS QA - https://wfsso-qa.pnc.com//pf/JWKS PROD - https://wfsso.pnc.com/pf/JWKS RND - https://signin-rnd.pnc.com/pf/JWKS UAT - https://signin-uat.pnc.com/pf/JWKS QA - https://signin-qa.pnc.com/pf/JWKS PROD - https://signin.pnc.com/pf/JWKS Access token decode endpoint WF apps WF legacy RND - https://wfsso-apps-rnd.pnc.com/idp/userinfo.openid?schema=openid&access_token= UAT - https://wfsso-apps-uat.pnc.com/idp/userinfo.openid?schema=openid&access_token= QA - https://wfsso-apps-qa.pnc.com/idp/userinfo.openid?schema=openid&access_token= PROD - https://wfsso-apps.pnc.com/idp/userinfo.openid?schema=openid&access_token= RND - https://iam-idp-wf-rnd.pncint.net/idp/userinfo.openid?schema=openid&access_token= UAT - https://iam-idp-wf-uat.pncint.net/idp/userinfo.openid?schema=openid&access_token= QA - https://wfsso-qa.pnc.com/idp/userinfo.openid?schema=openid&access_token= PROD - https://wfsso.pnc.com/idp/userinfo.openid?schema=openid&access_token=",
+                    "space": {
+                        "name": "Enterprise Identity Technology",
+                        "link": "/spaces/csoteams/overview",
+                        "id": 164462608,
+                        "key": "csoteams"
+                    },
+                    "versionNumber": 16,
+                    "versionBy": {
+                        "displayName": "Dev Shukla",
+                        "userKey": "8a8f043267981f980168808ac65e004a",
+                        "username": "ZX16092",
+                        "profilePicturePath": "/download/attachments/48208472/user-avatar"
+                    },
+                    "labels": [
+                        {
+                            "prefix": "global",
+                            "name": "kb-how-to-article",
+                            "id": "6422541"
+                        }
+                    ],
+                    "createdDate": "2023-03-16T17:21:06-04:00",
+                    "createdBy": {
+                        "displayName": "Dev Shukla",
+                        "userKey": "8a8f043267981f980168808ac65e004a",
+                        "username": "ZX16092",
+                        "profilePicturePath": "/download/attachments/48208472/user-avatar"
+                    },
+                    "id": "838382015",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/csoteams/pages/162610542/Enterprise+Identity+Technology",
+                            "id": "162610542",
+                            "type": "page",
+                            "title": "Enterprise Identity Technology"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/260224183/Enterprise+Identity+Engineering+-+Integration",
+                            "id": "260224183",
+                            "type": "page",
+                            "title": "*Enterprise Identity Engineering - Integration"
+                        },
+                        {
+                            "link": "/spaces/csoteams/pages/169058120/Integration+-+How-to+articles",
+                            "id": "169058120",
+                            "type": "page",
+                            "title": "Integration - How-to articles"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:09:51.3984974+00:00",
+                    "hash": "6b34adfc6695646d"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> https://iam-mbl-uat.pncint.net/as/authorization.<mark>oauth</mark><mark>2</mark> https://iam-mbl-uat.pncint.net/as/introspect.<mark>oauth</mark><mark>2</mark> QA https://signin-qa.pnc.com",
+                        "/pf/heartbeat.ping https://wfsso-apps.pnc.com/as/<mark>token.oauth2</mark> https://wfsso-apps.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://wfsso-apps.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark>",
+                        "https://wfsso-apps-qa.pnc.com/pf/heartbeat.ping https://wfsso-apps-qa.pnc.com/as/<mark>token.oauth2</mark> https://wfsso-apps-qa.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https",
+                        "https://signin.pnc.com/pf/heartbeat.ping https://signin.pnc.com/as/<mark>token.oauth2</mark> https://signin.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://signin.pnc.com/",
+                        "/pf/heartbeat.ping https://iam-idp-cst-uat.pncint.net/as/<mark>token.oauth2</mark> https://iam-idp-cst-uat.pncint.net/as/authorization.<mark>oauth</mark><mark>2</mark> https://iam-idp-cst-uat.pncint.net"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "454335822",
+                "_score": 289.72562,
+                "_source": {
+                    "versionWhen": "2023-08-15T15:39:10-04:00",
+                    "type": "page",
+                    "title": "Ping token info - wba-cfi-ma-sidecar-api",
+                    "body": "PING request Scopes: sys:sfp-current-account-dsp:invoke:all wba-cfi-ma-sidecar-api Environment URL ClientID Secret RND https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 rtl_i00400_wba_45 lqxki6nGMIN8FD7IDZ0weG4EUWKxN26DvzsSmJQRdyL71diZIkDY2xab43OuaA3N UAT https://iam-idp-wf-uat.pncint.net/as/token.oauth2 rtl_i00400_wba_45 Jgfl7SYEL636BIY4YKA60vjKcrjmZZNxX9jZax8VwGqaRkbnqCGUoRtxWrUJFr29 QA https://wfsso-qa.pnc.com/as/token.oauth2 rtl_i00400_wba_45 jVFq9YnaQ8nj9soVmglT5Tl81L2vofE0jlhEo77AejyfMjjt9dY36N4ITYnQiLcA PROD RND WF token endpoint : https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT WF token endpoint : https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA WF token endpoint : https://wfsso-qa.pnc.com/as/token.oauth2 Centralized Signing Endpoint for WF RND - https://iam-idp-wf-rnd.pncint.net/pf/JWKS UAT - https://iam-idp-wf-uat.pncint.net/pf/JWKS QA - https://wfsso-qa.pnc.com//pf/JWKS PROD - https://wfsso.pnc.com/pf/JWKS Client ID: rtl_i00400_wba_45 RND secret: lqxki6nGMIN8FD7IDZ0weG4EUWKxN26DvzsSmJQRdyL71diZIkDY2xab43OuaA3N UAT secret: Jgfl7SYEL636BIY4YKA60vjKcrjmZZNxX9jZax8VwGqaRkbnqCGUoRtxWrUJFr29 QA secret: jVFq9YnaQ8nj9soVmglT5Tl81L2vofE0jlhEo77AejyfMjjt9dY36N4ITYnQiLcA Payload: { \"scope\": \"sys:sfp-current-account-dsp:invoke:all wba-cfi-ma-sidecar-api\", \"client_id\": \"rtl_i00400_wba_45\", \"iss\": \"pfwf-rnd\", \"jti\": \"tFjJLFRvLJIvm4laT1AFMi0r4wrv0zse\", \"exp\": 1645735382 }",
+                    "space": {
+                        "name": "Dunder Mifflin/ Schrute Farms ",
+                        "link": "/spaces/DM/overview",
+                        "id": 217088032,
+                        "key": "DM"
+                    },
+                    "versionNumber": 8,
+                    "versionBy": {
+                        "displayName": "Shilpa Agarwal",
+                        "userKey": "8aaec5028595102501859d916b470010",
+                        "username": "PL05197",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2022-02-08T15:10:07-05:00",
+                    "createdBy": {
+                        "displayName": "Joseph Bumbaugh",
+                        "userKey": "8aa4c5d570c57e6301711862cf7400b6",
+                        "username": "PL08951",
+                        "profilePicturePath": "/download/attachments/159858445/user-avatar"
+                    },
+                    "id": "454335822",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DM/pages/218823987/Dunder+Mifflin+Schrute+Farms+Do+not+use",
+                            "id": "218823987",
+                            "type": "page",
+                            "title": "Dunder Mifflin / Schrute Farms (Do not use)"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/218824020/Documentation+File+lists",
+                            "id": "218824020",
+                            "type": "page",
+                            "title": "Documentation & File lists"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/218824082/APIs",
+                            "id": "218824082",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/222069011/WBA",
+                            "id": "222069011",
+                            "type": "page",
+                            "title": "WBA"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/252942562/wba-cfi-ma-sidecar-api",
+                            "id": "252942562",
+                            "type": "page",
+                            "title": "wba-cfi-ma-sidecar-api"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:17:51.4872294+00:00",
+                    "hash": "b834c459c509dff6"
+                },
+                "highlight": {
+                    "title": [
+                        "Ping <mark>token</mark> info - wba-cfi-ma-sidecar-api"
+                    ],
+                    "body": [
+                        "PROD RND WF <mark>token</mark> endpoint : https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT WF <mark>token</mark> endpoint : https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark>",
+                        "rtl_i00400_wba_45 lqxki6nGMIN8FD7IDZ0weG4EUWKxN26DvzsSmJQRdyL71diZIkDY<mark>2</mark>xab43OuaA3N UAT https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> rtl_i00400_wba",
+                        "QA WF <mark>token</mark> endpoint : https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> Centralized Signing Endpoint for WF RND - https://iam-idp-wf-rnd.pncint.net/pf/JWKS UAT",
+                        "request Scopes: sys:sfp-current-account-dsp:invoke:all wba-cfi-ma-sidecar-api Environment URL ClientID Secret RND https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark>",
+                        "_45 Jgfl7SYEL636BIY4YKA60vjKcrjmZZNxX9jZax8VwGqaRkbnqCGUoRtxWrUJFr29 QA https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> rtl_i00400_wba_45 jVFq9YnaQ8nj9soVmglT5Tl81L<mark>2</mark>vofE0jlhEo77AejyfMjjt9dY36N4ITYnQiLcA"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1725515500",
+                "_score": 289.15747,
+                "_source": {
+                    "versionWhen": "2025-11-20T18:46:32-05:00",
+                    "type": "page",
+                    "title": "PING Issues",
+                    "body": "Ping is a suite of Digital Identity software that aims to protect the assets and information of both customers and workforce alike. Digital Identity involves a centralized platform and tool set chosen by PNC to ensure those accessing our systems are truly who they say they are, and have the right to do what they are trying to do. By centralizing this function to an enterprise Digital Identity platform, identity standards are able to be applied broadly and consistently. A centralized platform leads to a centralized audit trail of all access events, making it easier to prove who is accessing what resources and when. Additionally, it reduces the friction of end-user log in experiences through credential consolidation and single sign-on orchestration. Furthermore, it improves security and speed to market by externalizing sensitive authentication and authorization functions outside of each individual application. Ping manages authentication and authorization using standards-based protocols, the software suite contains the following: PingFederate : on-premise \"global authentication authority\" used for internal and external application single sign-on, policy management, and identity management through standards-based protocols such as OAuth, OpenID Connect, and SAML PingAccess : integrates with PingFederate for authentication and web access control PingID : cloud based service for multi-factor authentication for workforce users PING Token : This is required by the services that uses zOS proxy to communicate with the mainframe system. Please follow the instructions posted on Create PING Token - API Innovation - Confluence (pncint.net) to create a PING token. Endpoint/URLs Workforce PingFederate Environments RND : https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 https://iam-idp-wf-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-wf-rnd.pncint.net/as/introspect.oauth2 UAT : https://iam-idp-wf-uat.pncint.net/as/token.oauth2 https://iam-idp-wf-uat.pncint.net/as/authorization.oauth2 https://iam-idp-wf-uat.pncint.net/as/introspect.oauth2 QA : https://wfsso-qa.pnc.com/as/token.oauth2 https://wfsso-qa.pnc.com/as/authorization.oauth2 https://wfsso-qa.pnc.com/as/introspect.oauth2 PROD : https://wfsso.pnc.com/as/token.oauth2 https://wfsso.pnc.com/as/authorization.oauth2 https://wfsso.pnc.com/as/introspect.oauth2 Customer PingFederate Environments RND : https://iam-idp-cst-rnd.pncint.net/as/token.oauth2 https://iam-idp-cst-rnd.pncint.net/as/authorization.oauth2 https://iam-idp-cst-rnd.pncint.net/as/introspect.oauth2 UAT : https://iam-idp-cst-uat.pncint.net/as/token.oauth2 https://iam-idp-cst-uat.pncint.net/as/authorization.oauth2 https://iam-idp-cst-uat.pncint.net/as/introspect.oauth2 QA : https://signin-qa.pnc.com/as/token.oauth2 https://signin-qa.pnc.com/as/authorization.oauth2 https://signin-qa.pnc.com/as/introspect.oauth2 PROD : https://signin.pnc.com/as/token.oauth2 https://signin.pnc.com/as/authorization.oauth2 https://signin.pnc.com/as/introspect.oauth2 PING Support engagement process In order to engage the PING support team, the user needs to login to https://support.pingidentity.com Follow the instructions posted on Ping Support Engagement - Digital Identity - Integration - Confluence (pncint.net) Note: First time users would need to create an account using their email id and password. Upon submitting the request, a verification email will be sent out to the email address. Once registered, the user can follow the instruction posted in above link to submit a support case. Monitoring on Dynatrace dashboard Below dashboards available for monitoring IAM- POC Ping Directry PE - : QA - Dynatrace (pncint.net) PING Dashboard QA - : QA - Dynatrace (pncint.net) OFD/Ping/RSA Monitoring Overview - : QA - Dynatrace (pncint.net)",
+                    "space": {
+                        "name": "Digital Delivery and Data Services",
+                        "link": "/spaces/DDDS/overview",
+                        "id": 564756486,
+                        "key": "DDDS"
+                    },
+                    "versionNumber": 2,
+                    "versionBy": {
+                        "displayName": "Jackie Heckman",
+                        "userKey": "8aa4c5d47e8fd34b017f218f4683005f",
+                        "username": "PK12398",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2025-04-30T14:07:30-04:00",
+                    "createdBy": {
+                        "displayName": "Jackie Heckman",
+                        "userKey": "8aa4c5d47e8fd34b017f218f4683005f",
+                        "username": "PK12398",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1725515500",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DDDS/pages/561489163/Digital+Delivery+and+Data+Services",
+                            "id": "561489163",
+                            "type": "page",
+                            "title": "Digital Delivery and Data Services"
+                        },
+                        {
+                            "link": "/spaces/DDDS/pages/562175791/API+PINACLE+Connect",
+                            "id": "562175791",
+                            "type": "page",
+                            "title": "API / PINACLE Connect"
+                        },
+                        {
+                            "link": "/spaces/DDDS/pages/1725515336/API+Implementations",
+                            "id": "1725515336",
+                            "type": "page",
+                            "title": "API Implementations"
+                        },
+                        {
+                            "link": "/spaces/DDDS/pages/1725515465/Troubleshooting+Tips+Tools",
+                            "id": "1725515465",
+                            "type": "page",
+                            "title": "Troubleshooting Tips & Tools"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:02:01.3637723+00:00",
+                    "hash": "e849a153e0eb742e"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/authorization.<mark>oauth</mark><mark>2</mark> https://signin-qa.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark> PROD : https://signin.pnc.com/as/<mark>token.oauth2</mark> https://signin.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark>",
+                        "https://iam-idp-wf-uat.pncint.net/as/introspect.<mark>oauth</mark><mark>2</mark> QA : https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> https://wfsso-qa.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark>",
+                        "/as/authorization.<mark>oauth</mark><mark>2</mark> https://iam-idp-cst-uat.pncint.net/as/introspect.<mark>oauth</mark><mark>2</mark> QA : https://signin-qa.pnc.com/as/<mark>token.oauth2</mark> https://signin-qa.pnc.com",
+                        "https://wfsso-qa.pnc.com/as/introspect.<mark>oauth</mark><mark>2</mark> PROD : https://wfsso.pnc.com/as/<mark>token.oauth2</mark> https://wfsso.pnc.com/as/authorization.<mark>oauth</mark><mark>2</mark> https://wfsso.pnc.com",
+                        "https://iam-idp-wf-rnd.pncint.net/as/introspect.<mark>oauth</mark><mark>2</mark> UAT : https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> https://iam-idp-wf-uat.pncint.net/as/authorization.<mark>oauth</mark><mark>2</mark>"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "467342266",
+                "_score": 289.06876,
+                "_source": {
+                    "versionWhen": "2022-07-25T17:04:57-04:00",
+                    "type": "page",
+                    "title": "Ping token info - wba-cfi-ma-cash-reserve-outer-api",
+                    "body": "Scopes: Environment Url ClientID Secret RND https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 QA https://wfsso-qa.pnc.com/as/token.oauth2 UAT https://iam-idp-wf-uat.pncint.net/as/token.oauth2 PROD",
+                    "space": {
+                        "name": "Dunder Mifflin/ Schrute Farms ",
+                        "link": "/spaces/DM/overview",
+                        "id": 217088032,
+                        "key": "DM"
+                    },
+                    "versionNumber": 6,
+                    "versionBy": {
+                        "displayName": "Mick Rose",
+                        "userKey": "8a8f043264617e2f016499984d9d000d",
+                        "username": "ZX03575",
+                        "profilePicturePath": "/download/attachments/15893353/user-avatar"
+                    },
+                    "labels": [],
+                    "createdDate": "2022-02-28T14:55:37-05:00",
+                    "createdBy": {
+                        "displayName": "Mick Rose",
+                        "userKey": "8a8f043264617e2f016499984d9d000d",
+                        "username": "ZX03575",
+                        "profilePicturePath": "/download/attachments/15893353/user-avatar"
+                    },
+                    "id": "467342266",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DM/pages/218823987/Dunder+Mifflin+Schrute+Farms+Do+not+use",
+                            "id": "218823987",
+                            "type": "page",
+                            "title": "Dunder Mifflin / Schrute Farms (Do not use)"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/467339523/Retired+Pages",
+                            "id": "467339523",
+                            "type": "page",
+                            "title": "Retired Pages"
+                        },
+                        {
+                            "link": "/spaces/DM/pages/454346356/wba-cfi-ma-cash-reserve-outer-api",
+                            "id": "454346356",
+                            "type": "page",
+                            "title": "wba-cfi-ma-cash-reserve-outer-api"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:23:39.4275345+00:00",
+                    "hash": "9b148076e9937b20"
+                },
+                "highlight": {
+                    "title": [
+                        "Ping <mark>token</mark> info - wba-cfi-ma-cash-reserve-outer-api"
+                    ],
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> PROD",
+                        "Scopes: Environment Url ClientID Secret RND https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> QA https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> UAT https://iam-idp-wf-uat.pncint.net"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1859620865",
+                "_score": 288.2907,
+                "_source": {
+                    "versionWhen": "2025-07-22T11:20:12-04:00",
+                    "type": "page",
+                    "title": "pnx-insights-inner-api",
+                    "body": "BitBucket Repos Code https://git.pncint.net/projects/PNX/repos/pnx-insights-inner-api/browse API Endpoints RND Swagger URL https://pnx-insights-pnx-srvcs-rnd.apps.gp2-ocp4-rnd.pncint.net/swagger-ui/index.html UAT Jenkins urls CI https://pnx-jenkins.apps.ethe-ocp4-qa.pncint.net/job/pnx/job/pnx-insights-inner-api/ DT Links LogScale Ping ClientID and scopes Client Id rtl_i00400_wba_261 Scope sys:pnx-insights-inner-api:invoke:all sys:pnx-insights:invoke:all CyberArk key to retrieve secret rtl_i00400_wba_261 RND token generation url https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 UAT token generation url https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA token generation url https://wfsso-qa.pnc.com/as/token.oauth2 Prod token generation url https://wfsso.pnc.com/as/token.oauth2",
+                    "space": {
+                        "name": "Digital Personalization",
+                        "link": "/spaces/Prsnlztn/overview",
+                        "id": 1141211147,
+                        "key": "Prsnlztn"
+                    },
+                    "versionNumber": 2,
+                    "versionBy": {
+                        "displayName": "Nagamani Avirneni",
+                        "userKey": "8aaec50281a8b2d60181d93d3453002e",
+                        "username": "PK43387",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2025-07-22T11:04:03-04:00",
+                    "createdBy": {
+                        "displayName": "Nagamani Avirneni",
+                        "userKey": "8aaec50281a8b2d60181d93d3453002e",
+                        "username": "PK43387",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1859620865",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/Prsnlztn/pages/1156910329/Digital+Personalization+Home",
+                            "id": "1156910329",
+                            "type": "page",
+                            "title": "Digital Personalization Home"
+                        },
+                        {
+                            "link": "/spaces/Prsnlztn/pages/1160843909/Development",
+                            "id": "1160843909",
+                            "type": "page",
+                            "title": "Development"
+                        },
+                        {
+                            "link": "/spaces/Prsnlztn/pages/1304368684/MicroServices+Development",
+                            "id": "1304368684",
+                            "type": "page",
+                            "title": "MicroServices Development"
+                        },
+                        {
+                            "link": "/spaces/Prsnlztn/pages/1756125352/MicroServices+Urls",
+                            "id": "1756125352",
+                            "type": "page",
+                            "title": "MicroServices Urls"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:04:56.7821429+00:00",
+                    "hash": "e849a153e0eb742e"
+                },
+                "highlight": {
+                    "body": [
+                        "url https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> Prod <mark>token</mark> generation url https://wfsso.pnc.com/as/<mark>token.oauth2</mark>",
+                        "generation url https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> UAT <mark>token</mark> generation url https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA <mark>token</mark> generation",
+                        "Code https://git.pncint.net/projects/PNX/repos/pnx-insights-inner-api/browse API Endpoints RND Swagger URL https://pnx-insights-pnx-srvcs-rnd.apps.gp<mark>2</mark>-",
+                        "Id rtl_i00400_wba_261 Scope sys:pnx-insights-inner-api:invoke:all sys:pnx-insights:invoke:all CyberArk key to retrieve secret rtl_i00400_wba_261 RND <mark>token</mark>"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1469809651",
+                "_score": 287.3341,
+                "_source": {
+                    "versionWhen": "2025-11-04T16:21:51-05:00",
+                    "type": "page",
+                    "title": "Documents API",
+                    "body": "Endpoint GET /ift/v1/documents/app-docs Description This API returns a list of documents associated with a given application as base64 encoded byte arrays. Business logic - For a given appId, get metadata on all documents associated with that appId from the IFT SOR. Then call a WCI endpoint to retrieve and return the documents themselves. Swagger Documentation Document-Retrieve-API-Swagger-v1.json Document-Retrieve-API-Swagger-v2.json Postman Collection (TODO) Hosting APIGEE, DataPower URLs RND oauth2-token-url: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 api-url (apigee): https://api-gw-rnd.pncint.net/ift/v1/documents/app-docs UAT oauth2-token-url: https://iam-idp-wf-uat.pncint.net/as/token.oauth2 api-url: QA oauth2-token-url: https://wfsso-qa.pnc.com/as/token.oauth2 api-url (DataPower): https://servicelinkqa.pnc.com/nonxml/IFT/PNCDocuments/api/ift/v1/documents/app-docs api-url (apigee QA): https://api-gw-qa.pncint.net/ift/v1/documents/app-docs api-url (apigee QA2): https://api-gw-2-qa.pncint.net/ift/v1/documents/app-docs PROD api-url (DataPower): https://servicelink.pnc.com/nonxml/IFT/PNCDocuments/api /ift/v1/documents/app-docs api-url (apigee): https://api-gw.pncint.net/ift/v1/documents/app-docs oauth2-token-url: https://wfsso.pnc.com/as/token.oauth2 oauth2-token-url (Datapower): https://servicelink.pnc.com/nonxml/IFT/as/token.oauth2 API Product CIB_IFT_Documents Client Onboarding APIGEE - Internal Developer Portal Datapower - Request external app in PING with scope sys:ift-documents:apps:all",
+                    "space": {
+                        "name": "Payfac Integration",
+                        "link": "/spaces/IFT/overview",
+                        "id": 634519559,
+                        "key": "IFT"
+                    },
+                    "versionNumber": 11,
+                    "versionBy": {
+                        "displayName": "Shashank Khati",
+                        "userKey": "8aa4c5d37c281f33017c9e69ee0d0071",
+                        "username": "PL32430",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2024-10-03T11:19:14-04:00",
+                    "createdBy": {
+                        "displayName": "Paul Seitz",
+                        "userKey": "8aa4cf3a7c281f4c017ca92fc9560077",
+                        "username": "PL25887",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1469809651",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/IFT/pages/628895987/IFT+-+Payfac+Integration+Layer",
+                            "id": "628895987",
+                            "type": "page",
+                            "title": "IFT - Payfac Integration Layer"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422748/Architecture",
+                            "id": "643422748",
+                            "type": "page",
+                            "title": "Architecture"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/643422754/APIs",
+                            "id": "643422754",
+                            "type": "page",
+                            "title": "APIs"
+                        },
+                        {
+                            "link": "/spaces/IFT/pages/1980506625/Payfac+Documents+APIs",
+                            "id": "1980506625",
+                            "type": "page",
+                            "title": "Payfac Documents APIs"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:02:25.7324735+00:00",
+                    "hash": "1c986f9363cdd80a"
+                },
+                "highlight": {
+                    "body": [
+                        "<mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> api-url: QA <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> api-url (DataPower",
+                        "/app-docs api-url (apigee): https://api-gw.pncint.net/ift/v1/documents/app-docs <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://wfsso.pnc.com/as/<mark>token.oauth2</mark> <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url",
+                        "RND <mark>oauth</mark><mark>2</mark>-<mark>token</mark>-url: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> api-url (apigee): https://api-gw-rnd.pncint.net/ift/v1/documents/app-docs UAT",
+                        "(Datapower): https://servicelink.pnc.com/nonxml/IFT/as/<mark>token.oauth2</mark> API Product CIB_IFT_Documents Client Onboarding APIGEE - Internal Developer Portal",
+                        "Swagger Documentation Document-Retrieve-API-Swagger-v1.json Document-Retrieve-API-Swagger-v<mark>2</mark>.json Postman Collection (TODO) Hosting APIGEE, DataPower URLs"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1702402153",
+                "_score": 286.57538,
+                "_source": {
+                    "versionWhen": "2025-04-08T19:33:22-04:00",
+                    "type": "page",
+                    "title": "Apigee Proxy",
+                    "body": "CIB_EKA_FMAC_MFMS_API_v1 Apigee Code Repos Source Repo: https://git.pncint.net/projects/ELM/repos/cib_freddiemac_mfms_api/browse Deploy Repo: https://git.pncint.net/projects/ELM/repos/cib_freddiemac_mfms_api_deploy/browse OAUTH RND: https://wfsso-rnd.pnc.com/as/token.oauth2 QA: https://wfsso-qa.pnc.com/as/token.oauth2 PROD: https://wfsso.pnc.com/as/token.oauth2",
+                    "space": {
+                        "name": "Midland Wing Development",
+                        "link": "/spaces/MWDD/overview",
+                        "id": 743178275,
+                        "key": "MWDD"
+                    },
+                    "versionNumber": 7,
+                    "versionBy": {
+                        "displayName": "John Bales",
+                        "userKey": "8aaec5037765e51e0177bb87635a0064",
+                        "username": "PL70147",
+                        "profilePicturePath": "/download/attachments/251986027/user-avatar"
+                    },
+                    "labels": [],
+                    "createdDate": "2025-04-08T17:16:13-04:00",
+                    "createdBy": {
+                        "displayName": "John Bales",
+                        "userKey": "8aaec5037765e51e0177bb87635a0064",
+                        "username": "PL70147",
+                        "profilePicturePath": "/download/attachments/251986027/user-avatar"
+                    },
+                    "id": "1702402153",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/MWDD/pages/761007102/Midland+Wing+Development",
+                            "id": "761007102",
+                            "type": "page",
+                            "title": "Midland Wing Development"
+                        },
+                        {
+                            "link": "/spaces/MWDD/pages/761007114/Development",
+                            "id": "761007114",
+                            "type": "page",
+                            "title": "Development"
+                        },
+                        {
+                            "link": "/spaces/MWDD/pages/857813366/Freddie+Mac+CREFC+Services",
+                            "id": "857813366",
+                            "type": "page",
+                            "title": "Freddie Mac CREFC Services"
+                        },
+                        {
+                            "link": "/spaces/MWDD/pages/1678392624/Apigee+Ping+Tokens+for+Outer+API",
+                            "id": "1678392624",
+                            "type": "page",
+                            "title": "Apigee & Ping Tokens for Outer API"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:07:10.8635288+00:00",
+                    "hash": "939decc5e4a29e28"
+                },
+                "highlight": {
+                    "body": [
+                        "RND: https://wfsso-rnd.pnc.com/as/<mark>token.oauth2</mark> QA: https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD: https://wfsso.pnc.com/as/<mark>token.oauth2</mark>",
+                        "git.pncint.net/projects/ELM/repos/cib_freddiemac_mfms_api/browse Deploy Repo: https://git.pncint.net/projects/ELM/repos/cib_freddiemac_mfms_api_deploy/browse <mark>OAUTH</mark>"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1609534755",
+                "_score": 285.377,
+                "_source": {
+                    "versionWhen": "2025-08-19T22:17:33-04:00",
+                    "type": "page",
+                    "title": "EDS and FileNet APIs",
+                    "body": "EDS API Authentication Method : OAuth2.0 ; Grant Type :ClientID and secrets generate the Token . End point URLS : PingFederate endpoints Client Secrets : Reach out to Environment Token URL UAT https://iam-idp-wf-uat.pncint.net/as/token.oauth2 QA https://wfsso-qa.pnc.com/as/token.oauth2 PROD https://wfsso.pnc.com/as/token.oauth2 Search Party Retrieve Party Maintain Party Individual Maintain Party Non Individual Error Codes : EDS API error Codes",
+                    "space": {
+                        "name": "Risk Rating Platform",
+                        "link": "/spaces/RRP/overview",
+                        "id": 1163067396,
+                        "key": "RRP"
+                    },
+                    "versionNumber": 14,
+                    "versionBy": {
+                        "displayName": "Sumanth Chillakuru",
+                        "userKey": "8a862da98b0d5cdd018b14af1b370004",
+                        "username": "PK49076",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2025-02-10T14:08:54-05:00",
+                    "createdBy": {
+                        "displayName": "Sumanth Chillakuru",
+                        "userKey": "8a862da98b0d5cdd018b14af1b370004",
+                        "username": "PK49076",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "1609534755",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/RRP/pages/1160457634/RRP+-+Risk+Rating+Platform",
+                            "id": "1160457634",
+                            "type": "page",
+                            "title": "RRP - Risk Rating Platform"
+                        },
+                        {
+                            "link": "/spaces/RRP/pages/1160458248/RRP+-+Dev+Engineering",
+                            "id": "1160458248",
+                            "type": "page",
+                            "title": "RRP - Dev Engineering"
+                        },
+                        {
+                            "link": "/spaces/RRP/pages/1592247863/Regulation+O",
+                            "id": "1592247863",
+                            "type": "page",
+                            "title": "Regulation O"
+                        },
+                        {
+                            "link": "/spaces/RRP/pages/1893035737/Phase+1+MRA+1+MRA2",
+                            "id": "1893035737",
+                            "type": "page",
+                            "title": "Phase 1 (MRA 1 & MRA2)"
+                        },
+                        {
+                            "link": "/spaces/RRP/pages/1592247872/MRA+1-+Regulation+of+Controls",
+                            "id": "1592247872",
+                            "type": "page",
+                            "title": "MRA 1- Regulation of Controls"
+                        },
+                        {
+                            "link": "/spaces/RRP/pages/1592259387/Legal+Work+Flow+Entity+Management",
+                            "id": "1592259387",
+                            "type": "page",
+                            "title": "Legal Work Flow ( Entity Management)"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:04:19.5937645+00:00",
+                    "hash": "41ac7c1b7a73d449"
+                },
+                "highlight": {
+                    "body": [
+                        "://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> PROD https://wfsso.pnc.com/as/<mark>token.oauth2</mark> Search Party Retrieve Party Maintain Party Individual Maintain Party Non",
+                        "End point URLS : PingFederate endpoints Client Secrets : Reach out to Environment <mark>Token</mark> URL UAT https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> QA https",
+                        "EDS API Authentication Method : <mark>OAuth</mark><mark>2</mark>.0 ; Grant Type :ClientID and secrets generate the <mark>Token</mark> ."
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "1371782529",
+                "_score": 284.57422,
+                "_source": {
+                    "versionWhen": "2025-11-24T16:30:12-05:00",
+                    "type": "page",
+                    "title": "BCC Fraud Integration Details",
+                    "body": "BCC SOM LDF Environment Authentication Environment LDF Environment LDF URL Auth details DEV/UAT/QA DEV https://som-bcc-fraud-decision-service-inner-som-rnd2.apps.ocp4-rnd.pncint.net/api/fraud-decision URL: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id : rtl_i00400_som_02 DEV/UAT/QA 25.12.0 RND1 https://som-bcc-fraud-decision-service-inner-som-rnd1.apps.gp2-ocp4-rnd.pncint.net/api/fraud-decision URL: https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 DEV/UAT/QA 25.12.0 UAT1 https://som-bcc-fraud-decision-service-inner-som-uat1.apps.gp2-ocp4-uat.pncint.net/api/fraud-decision https://iam-idp-wf-uat.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 DEV/UAT/QA 25.12.0 QA1 https://som-bcc-fraud-decision-service-inner-som-qa1.apps.gp2-ocp4-qa.pncint.net/api/fraud-decision https://wfsso-qa.pnc.com/as/token.oauth2 client-id: rtl_i00400_som_02 DEV/UAT/QA 26.1.0 RND2 https://som-bcc-fraud-decision-service-som-rnd2.apps.gp5-ocp4-rnd.pncint.net/api/fraud-decision https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 DEV/UAT/QA 26.1.0 UAT2 https://som-bcc-fraud-decision-service-som-uat2.apps.gp5-ocp4-uat.pncint.net/api/fraud-decision https://iam-idp-wf-uat.pncint.net/as/token.oauth2 client-id: rtl_i00400_som_02 DE/UAT/QA 25.10.0 QA2 https://som-bcc-fraud-decision-service-inner-som-qa2.apps.gp5-ocp4-qa.pncint.net/api/fraud-decision https://wfsso-qa.pnc.com/as/token.oauth2 client-id: rtl_i00400_som_02 LDF Environment for BCC Environment LDF Environment LDF URL Virtual Hi- Jak URL Notes DEV RND https://api-gw-rnd.pncint.net/ldf/orchestrator/v1/businessConsumerCards/bccr http://qev-vsc5-uat.pncint.net:7106 /originations-platform/orchestration/v1/bccFraudDataResponse UAT UAT https://api-gw-uat.pncint.net/ldf/orchestrator/v1/businessConsumerCards/bccr http://qev-vsc5-uat.pncint.net:7106 /originations-platform/orchestration/v1/bccFraudDataResponse QA QA https://api-gw-qa.pncint.net/ldf/orchestrator/v1/businessConsumerCards/bccr http://qev-vsc10-qa.pncint.net:7071/originations-platform/orchestration/v1/bccFraudDataResponse Swagger URL RND1 https://fraud-orchestrator-api-ldf-rnd.apps.ocp4-rnd.pncint.net/swagger-ui/swagger-ui/index.html#/ UAT1 https://fraud-orchestrator-api-ldf-uat.apps.ocp4-uat.pncint.net/swagger-ui/swagger-ui/index.html#/ QA1 https://fraud-orchestrator-api-ldf-qa.apps.ocp4-qa.pncint.net/swagger-ui/swagger-ui/index.html#/ Mozart Tenant Settings https://mozart-qa.pncint.net/tenant-admin/settings Resources Document Type Resource Postman Collection LDF_PostMan_Collections.zip BCC Fraud Decision Service Inner https://git.pncint.net/projects/SOM/repos/som-bcc-fraud-decision-service-inner",
+                    "space": {
+                        "name": "Symphony Lending Platform - SOM",
+                        "link": "/spaces/SOM/overview",
+                        "id": 707133448,
+                        "key": "SOM"
+                    },
+                    "versionNumber": 13,
+                    "versionBy": {
+                        "displayName": "Adam Grzegorczyk",
+                        "userKey": "8aaec504874a680f0187716a21fb002b",
+                        "username": "PL27002",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2024-07-22T16:36:58-04:00",
+                    "createdBy": {
+                        "displayName": "Sachin Keshari",
+                        "userKey": "8aaec50483a18eaf0183ed12872e0065",
+                        "username": "PK45585",
+                        "profilePicturePath": "/download/attachments/685401412/user-avatar"
+                    },
+                    "id": "1371782529",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/SOM/pages/703673911/SOM+Home",
+                            "id": "703673911",
+                            "type": "page",
+                            "title": "SOM Home"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/979825671/Teams",
+                            "id": "979825671",
+                            "type": "page",
+                            "title": "Teams"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/952893417/Phoenix+Flames",
+                            "id": "952893417",
+                            "type": "page",
+                            "title": "Phoenix Flames"
+                        },
+                        {
+                            "link": "/spaces/SOM/pages/1262698006/Technology+Delivery+BCC",
+                            "id": "1262698006",
+                            "type": "page",
+                            "title": "Technology & Delivery (BCC)"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:01:58.0315807+00:00",
+                    "hash": "2ec13397f5c17654"
+                },
+                "highlight": {
+                    "body": [
+                        "https://som-bcc-fraud-decision-service-inner-som-rnd1.apps.gp<mark>2</mark>-ocp4-rnd.pncint.net/api/fraud-decision URL: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark>",
+                        ".apps.gp5-ocp4-rnd.pncint.net/api/fraud-decision https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> client-id: rtl_i00400_som_02 DEV/UAT/QA 26.1.0 UAT<mark>2</mark>",
+                        "https://som-bcc-fraud-decision-service-som-uat<mark>2</mark>.apps.gp5-ocp4-uat.pncint.net/api/fraud-decision https://iam-idp-wf-uat.pncint.net/as/<mark>token.oauth2</mark> client-id",
+                        ".apps.gp<mark>2</mark>-ocp4-qa.pncint.net/api/fraud-decision https://wfsso-qa.pnc.com/as/<mark>token.oauth2</mark> client-id: rtl_i00400_som_02 DEV/UAT/QA 26.1.0 RND<mark>2</mark> https://som-bcc-fraud-decision-service-som-rnd<mark>2</mark>",
+                        "apps.ocp4-rnd.pncint.net/api/fraud-decision URL: https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark> client-id : rtl_i00400_som_02 DEV/UAT/QA 25.12.0 RND1"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            },
+            {
+                "_index": "source-confluence-2026.05.27.065649",
+                "_id": "647084098",
+                "_score": 284.5482,
+                "_source": {
+                    "versionWhen": "2022-08-26T03:43:19-04:00",
+                    "type": "page",
+                    "title": "DSA Product Manager Outer",
+                    "body": "dsa-cpn-product-manager-service Environment Client Id Client Secret External Scope URL RND rtl_i00400_dsa_10 HhiCMexU1NFyXhar3I0jXpCEHSP32FWfOKh4oFWH95l1HVbLlUy7h1XGym026WTF DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://iam-idp-wf-rnd.pncint.net/as/token.oauth2 Test-QA rtl_i00400_dsa_10 oV19PU3BZxcHeZ2OslzzDbOaBPgAI8hGLygXorAh0VXcDn7KdFh2bTedxUQ7Em07 DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 Stage-QA rtl_i00400_dsa_10 oV19PU3BZxcHeZ2OslzzDbOaBPgAI8hGLygXorAh0VXcDn7KdFh2bTedxUQ7Em07 DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://wfsso-qa.pnc.com/as/token.oauth2 UAT rtl_i00400_dsa_10 SibyZiWUaLH4smbJUbRY1QaTdDffvLtSfk38xh9kNBvcNDiWA1IfyNWDOeJCZslU DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://iam-idp-wf-uat.pncint.net/as/token.oauth2 Prod-GF1 Prod-GF2",
+                    "space": {
+                        "name": "DSA",
+                        "link": "/spaces/DSA/overview",
+                        "id": 141721635,
+                        "key": "DSA"
+                    },
+                    "versionNumber": 1,
+                    "versionBy": {
+                        "displayName": "Praveen Kumar A",
+                        "userKey": "8aa4c5d47be76be8017be9ad098b0002",
+                        "username": "PL75258",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "labels": [],
+                    "createdDate": "2022-08-26T03:39:06-04:00",
+                    "createdBy": {
+                        "displayName": "Praveen Kumar A",
+                        "userKey": "8aa4c5d47be76be8017be9ad098b0002",
+                        "username": "PL75258",
+                        "profilePicturePath": "/images/icons/profilepics/default.svg"
+                    },
+                    "id": "647084098",
+                    "ancestors": [
+                        {
+                            "link": "/spaces/DSA/pages/141307180/DSA+Home+-+DOT+pnc.com+Sub+Applications+Mnemonic",
+                            "id": "141307180",
+                            "type": "page",
+                            "title": "DSA Home - DOT (pnc.com) Sub Applications Mnemonic"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/153715698/Dev",
+                            "id": "153715698",
+                            "type": "page",
+                            "title": "Dev"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/493362725/DSA-OCP+Apps",
+                            "id": "493362725",
+                            "type": "page",
+                            "title": "DSA-OCP Apps"
+                        },
+                        {
+                            "link": "/spaces/DSA/pages/183381846/DSA+Client+Id+and+Client+secret",
+                            "id": "183381846",
+                            "type": "page",
+                            "title": "DSA Client Id and Client secret"
+                        }
+                    ],
+                    "batchIndexDate": "2026-05-27T07:23:15.4245938+00:00",
+                    "hash": "2025c67fb0f7d358"
+                },
+                "highlight": {
+                    "body": [
+                        "/as/<mark>token.oauth2</mark> Prod-GF1 Prod-GF<mark>2</mark>",
+                        "as/<mark>token.oauth2</mark> Stage-QA rtl_i00400_dsa_10 oV19PU3BZxcHeZ<mark>2</mark>OslzzDbOaBPgAI8hGLygXorAh0VXcDn7KdFh<mark>2</mark>bTedxUQ7Em07 DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://wfsso-qa.pnc.com",
+                        "rtl_i00400_dsa_10 HhiCMexU1NFyXhar3I0jXpCEHSP32FWfOKh4oFWH95l1HVbLlUy7h1XGym026WTF DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://iam-idp-wf-rnd.pncint.net/as/<mark>token.oauth2</mark>",
+                        "/as/<mark>token.oauth2</mark> UAT rtl_i00400_dsa_10 SibyZiWUaLH4smbJUbRY1QaTdDffvLtSfk38xh9kNBvcNDiWA1IfyNWDOeJCZslU DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://iam-idp-wf-uat.pncint.net",
+                        "Test-QA rtl_i00400_dsa_10 oV19PU3BZxcHeZ<mark>2</mark>OslzzDbOaBPgAI8hGLygXorAh0VXcDn7KdFh<mark>2</mark>bTedxUQ7Em07 DSA-CPN-PRODUCT-MANAGEMENT-ACCESS https://wfsso-qa.pnc.com/"
+                    ]
+                },
+                "inner_hits": {
+                    "matched_labels": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    },
+                    "matched_ancestors": {
+                        "hits": {
+                            "total": {
+                                "value": 0,
+                                "relation": "eq"
+                            },
+                            "max_score": null,
+                            "hits": []
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}

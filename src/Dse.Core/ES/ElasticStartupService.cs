@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using Dse.Shared;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Nodes;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +18,7 @@ public sealed record ElasticStartupData(
 public sealed class ElasticStartupService(
     ILogger<ElasticStartupService> logger,
     ElasticsearchClient client,
-    DseEnv env,
+    IDseEnvironment env,
     IConfiguration cfg) : BackgroundService
 {
     private const long DefaultBulkMaxByteSize = 100L * 1024 * 1024;
@@ -31,7 +32,7 @@ public sealed class ElasticStartupService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (env is DseEnv.Test)
+        if (env.IsTest())
         {
             _data = new ElasticStartupData(MaxChannelConcurrency: 15, DefaultBulkMaxByteSize, DataNodeCount: 2);
             return;

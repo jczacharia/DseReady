@@ -13,10 +13,12 @@ using JasperFx.Resources;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Weasel.EntityFrameworkCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 
@@ -39,13 +41,15 @@ public sealed class TestFixture : IAsyncLifetime
 
     private Process? _process;
     public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
-    private CancellationToken Ct => TestContext.Current.CancellationToken;
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
 
     public async ValueTask InitializeAsync()
     {
         ConfigurationBuilder config = new();
 
-        if (DseEnv.IsReleaseBuild)
+        if (IDseEnvironment.IsRelease)
         {
             string esHome = await EnsureEsDownloadedAsync();
             await StartAsync(esHome);
@@ -76,9 +80,10 @@ public sealed class TestFixture : IAsyncLifetime
                 }
             });
 
-            builder.ConfigureServices((_, services) =>
+            builder.ConfigureServices(services =>
             {
-                services.AddResourceSetupOnStartup(StartupAction.ResetState);
+                services.AddDatabaseCleaner<DataContext>();
+                services.AddInitialData<DataContext, DataMigrator>();
                 services.RunWolverineInSoloMode();
                 services
                     .AddAuthentication("Test")
@@ -88,6 +93,10 @@ public sealed class TestFixture : IAsyncLifetime
         {
             builder.AddUserSecrets("dse");
             builder.AddConfiguration(config.Build());
+            builder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Default"] = $"Data Source={_dbFilename}",
+            });
         }));
 
         _host.BeforeEach(context =>
@@ -95,13 +104,39 @@ public sealed class TestFixture : IAsyncLifetime
             context.Request.EnableBuffering();
         });
 
-        await Host.ResetAllDataAsync<DataContext>(Ct);
+        await TearDownAsync(_host.Services);
+    }
+
+    public async Task TearDownAsync(IServiceProvider services)
+    {
+        await Host.ResetResourceState(Ct);
+
+        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
+        // We don't add it add all so behavior is the same.
+
+        var esClient = services.GetRequiredService<ElasticsearchClient>();
+        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
+        {
+            string index = typeContext.ResolveIndexFormat();
+            Assert.StartsWith("test-", index);
+            await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
         await (_host?.StopAsync(Ct) ?? Task.CompletedTask);
         await (_host?.DisposeAsync() ?? ValueTask.CompletedTask);
+
+        // Clear the SQLite connection pool so the file handle is released,
+        // then delete the per-run database file.
+        SqliteConnection.ClearAllPools();
+        if (!string.IsNullOrEmpty(_dbFilename) && File.Exists(_dbFilename))
+        {
+            File.Delete(_dbFilename);
+        }
 
         if (_process is null)
         {
@@ -126,25 +161,6 @@ public sealed class TestFixture : IAsyncLifetime
             _process = null;
         }
     }
-
-    public async Task TearDownAsync(IServiceProvider services)
-    {
-        await Host.ResetAllDataAsync<DataContext>(Ct);
-
-        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
-        // We don't add it add all so behavior is the same.
-
-        var esClient = services.GetRequiredService<ElasticsearchClient>();
-        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
-        {
-            string index = typeContext.ResolveIndexFormat();
-            Assert.StartsWith("test-", index);
-            await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
-            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
-            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
-        }
-    }
-
 
     private static async Task<string> EnsureEsDownloadedAsync()
     {

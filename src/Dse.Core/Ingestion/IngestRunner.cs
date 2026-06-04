@@ -2,6 +2,7 @@
 
 
 using System.Diagnostics;
+using System.Text.Json;
 using Dse.Data;
 using Dse.ES;
 using Dse.Shared;
@@ -11,6 +12,7 @@ using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Ingest.Elasticsearch;
 using Elastic.Mapping;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -21,32 +23,24 @@ public sealed class IngestRunner<TDoc>(
     IIngest<TDoc> ingest,
     ElasticStartupService elasticStartup,
     ElasticsearchClient client,
-    IngestProgressBroadcaster broadcaster,
     ILoggerFactory loggerFactory,
     IServiceProvider services) : IIngestRunner where TDoc : class
 {
-    // Guards _currentIngestingPayload; the progress timer and the main pipeline write it from different threads.
-    private readonly object _gate = new();
-    private readonly ILogger _logger = loggerFactory.CreateLogger($"{typeof(TDoc).GetAssemblySourceKey()}Ingestor");
+    private readonly ILogger _logger = loggerFactory.CreateLogger($"{typeof(TDoc).GetRequiredSourceKey()}Ingestor");
     private readonly Stopwatch _stopwatch = new();
 
     private readonly ElasticsearchTypeContext _typeContext = services
-        .GetRequiredKeyedService<ElasticsearchTypeContext>(typeof(TDoc).GetAssemblySourceKey());
-
-    private IngestEventPayload? _currentIngestingPayload;
+        .GetRequiredKeyedService<ElasticsearchTypeContext>(typeof(TDoc).GetRequiredSourceKey());
 
     // Non-zero fails the run and skips alias promotion so an incomplete index is never aliased.
     private long _failedDocuments;
-
     private long _produced;
-
-    public SourceKey SourceKey => typeof(TDoc).GetAssemblySourceKey();
+    private IngestCheckpoint _checkpoint = IngestCheckpoint.Queued;
 
     public long Produced => Interlocked.Read(ref _produced);
-
     public TimeSpan Elapsed => _stopwatch.Elapsed;
     public long TotalToProduce { get; private set; }
-    public double PercentComplete => TotalToProduce > 0 ? Math.Min(100d, (double)Produced / TotalToProduce * 100d) : 0d;
+    public double PercentComplete => TotalToProduce > 0 ? Math.Min(val1: 100d, (double)Produced / TotalToProduce * 100d) : 0d;
     public double DocsPerSecond => Elapsed.TotalSeconds <= 0 ? 0d : Produced / Elapsed.TotalSeconds;
 
     public TimeSpan EstimatedRemaining => DocsPerSecond switch
@@ -55,6 +49,11 @@ public sealed class IngestRunner<TDoc>(
         _ when Produced >= TotalToProduce => TimeSpan.Zero,
         var dps => TimeSpan.FromSeconds((TotalToProduce - Produced) / dps),
     };
+
+    public SourceKey SourceKey => typeof(TDoc).GetRequiredSourceKey();
+
+    // Read live by the status endpoint while the run is in-flight; counters are Interlocked/Stopwatch, safe to read.
+    public IngestProgress CurrentSnapshot => Progress(_checkpoint);
 
     public async Task RunAsync(IngestRun run, CancellationToken ct)
     {
@@ -70,6 +69,10 @@ public sealed class IngestRunner<TDoc>(
 
         try
         {
+            // Claim: moves the run off Queued so a post-crash redelivery is recognized as interrupted, not restarted.
+            run.Advance(Progress(IngestCheckpoint.Started, new { run.DryRun }));
+            await SaveAsync(run, ct);
+
             BufferOptions bufferOptions = ingest.BufferOptions;
             bufferOptions.ExportMaxConcurrency = bufferOptions.ExportMaxConcurrency is { } exportMaxConcurrency
                 ? Math.Min(esData.MaxChannelConcurrency, exportMaxConcurrency)
@@ -118,144 +121,153 @@ public sealed class IngestRunner<TDoc>(
             });
 
             await channel.BootstrapElasticsearchAsync(BootstrapMethod.Failure, ct);
-            await Advance(run, new IngestEventPayload.Bootstrapped(
-                channel.IndexName,
-                channel.BatchExportSize,
-                channel.DrainSize,
-                channel.MaxConcurrency), ct);
+            run.Advance(Progress(IngestCheckpoint.Bootstrapped,
+                new { channel.IndexName, channel.BatchExportSize, channel.DrainSize, channel.MaxConcurrency }));
+            await SaveAsync(run, ct);
 
             long totalToProduce = await ingest.GetDesiredTotalToProduceAsync(ct);
-            TotalToProduce = dryRun ? Math.Clamp(totalToProduce, 0, 1) : totalToProduce;
-            await Advance(run, new IngestEventPayload.TotalMeasured(TotalToProduce), ct);
+            TotalToProduce = dryRun ? Math.Clamp(totalToProduce, min: 0, max: 1) : totalToProduce;
+            run.Advance(Progress(IngestCheckpoint.TotalMeasured, new { Total = TotalToProduce }));
+            await SaveAsync(run, ct);
 
             IngestContext<TDoc> context = new(channel, TotalToProduce);
             _stopwatch.Start();
 
-            await Advance(run, new IngestEventPayload.Ingesting(Snapshot()), ct);
+            run.Advance(Progress(IngestCheckpoint.Ingesting));
+            await SaveAsync(run, ct);
+            await ingest.IngestAsync(context, ct);
 
-            await using (TimerWorker.StartNew(
-                             async () =>
-                             {
-                                 IngestEventPayload.Ingesting? tick = null;
-                                 lock (_gate)
-                                 {
-                                     // Re-check so a tick can't overwrite a newer (e.g. Draining) state.
-                                     if (_currentIngestingPayload is IngestEventPayload.Ingesting)
-                                     {
-                                         var next = new IngestEventPayload.Ingesting(Snapshot());
-                                         _currentIngestingPayload = next;
-                                         tick = next;
-                                     }
-                                 }
-
-                                 if (tick is not null)
-                                 {
-                                     await PersistAndPublish(run, tick, ct);
-                                 }
-                             },
-                             ex => _logger.LogError(ex, "Progress reporting tick failed; continuing without it")))
+            run.Advance(Progress(IngestCheckpoint.Draining));
+            await SaveAsync(run, ct);
+            if (!await channel.WaitForDrainAsync(TimeSpan.FromHours(1), ct))
             {
-                await ingest.IngestAsync(context, ct);
-            }
-
-            await Advance(run, new IngestEventPayload.Draining(Snapshot()), ct);
-
-            if (!await channel.WaitForDrainAsync(null, ct))
-            {
-                await Advance(run, new IngestEventPayload.Failed("Channel timed out while waiting for drain"), ct);
+                run.Advance(Progress(IngestCheckpoint.Failed, new { reason = "Channel timed out while waiting for drain" }));
+                await SaveAsync(run, CancellationToken.None);
                 return;
             }
 
             if (dryRun)
             {
-                try
-                {
-                    DeleteIndexResponse deleteResponse = await client.Indices.DeleteAsync(channel.IndexName, ct);
-                    if (!deleteResponse.IsSuccess())
-                    {
-                        throw new InvalidOperationException(
-                            $"Elasticsearch responded with {deleteResponse.DebugInformation} " +
-                            $"when attempting to delete transient index: {channel.IndexName}");
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    /* transient-index delete is best-effort; cancellation is expected */
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex,
-                        "Failed to delete transient index '{IndexName}'; manual cleanup may be required",
-                        channel.IndexName);
-                }
+                await DeleteTransientIndexAsync(channel.IndexName, ct);
             }
 
-            long failedDocuments = Interlocked.Read(ref _failedDocuments);
-            if (failedDocuments > 0)
+            if (Interlocked.Read(ref _failedDocuments) is var failed and > 0)
             {
-                await Advance(run,
-                    new IngestEventPayload.Failed($"{failedDocuments} document(s) failed to index; alias not promoted."),
-                    ct);
+                run.Advance(Progress(IngestCheckpoint.Failed,
+                    new { reason = $"{failed} document(s) failed to index; alias not promoted." }));
+                await SaveAsync(run, CancellationToken.None);
                 return;
             }
 
+            // Last gate before the only visible side effect: if the run was canceled out from under us, never
+            // promote the alias. Searchers keep seeing the previous good index.
             if (!dryRun)
             {
-                await Advance(run, new IngestEventPayload.Aliasing(Snapshot()), ct);
+                if (!await StillActiveAsync(run))
+                {
+                    _logger.LogWarning("Run {RunId} was finalized before aliasing; skipping alias promotion", run.Id);
+                    return;
+                }
+
+                run.Advance(Progress(IngestCheckpoint.Aliasing));
+                await SaveAsync(run, ct);
                 if (!await channel.ApplyAliasesAsync(channel.IndexName, ct))
                 {
-                    await Advance(run, new IngestEventPayload.Failed("Alias application failed"), ct);
+                    run.Advance(Progress(IngestCheckpoint.Failed, new { reason = "Alias application failed" }));
+                    await SaveAsync(run, CancellationToken.None);
                     return;
+                }
+
+                try
+                {
+                    await channel.RefreshAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // ignored
                 }
             }
 
-            await Advance(run, new IngestEventPayload.Succeeded(Snapshot()), ct);
+            run.Advance(Progress(IngestCheckpoint.Succeeded));
+            await SaveAsync(run, CancellationToken.None);
         }
-        catch (OperationCanceledException e)
+        catch (OperationCanceledException)
         {
-            // None so the terminal write isn't itself cancelled.
-            await Advance(run, new IngestEventPayload.Canceled("Canceled: " + e.Message), CancellationToken.None);
+            // Interrupted, not Canceled: a user cancel records its own terminal via the API; reaching here means
+            // shutdown or the execution timeout fired. Defer to the API if it already finalized the run.
+            if (await StillActiveAsync(run))
+            {
+                run.Advance(Progress(IngestCheckpoint.Interrupted,
+                    new { reason = "Ingestion was interrupted (shutdown or execution timeout)." }));
+                await SaveAsync(run, CancellationToken.None);
+            }
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Ingest run failed with an exception");
-            await Advance(run, new IngestEventPayload.Faulted(ExceptionDto.From(e)), CancellationToken.None);
+            if (await StillActiveAsync(run))
+            {
+                run.Advance(Progress(IngestCheckpoint.Faulted, new { exception = ExceptionDto.From(e) }));
+                await SaveAsync(run, CancellationToken.None);
+            }
         }
     }
 
-    private async Task Advance(IngestRun run, IngestEventPayload payload, CancellationToken ct)
+    private async Task DeleteTransientIndexAsync(string indexName, CancellationToken ct)
     {
-        lock (_gate)
+        try
         {
-            _currentIngestingPayload = payload is IngestEventPayload.Ingesting ? payload : null;
+            DeleteIndexResponse deleteResponse = await client.Indices.DeleteAsync(indexName, ct);
+            if (!deleteResponse.IsSuccess())
+            {
+                throw new InvalidOperationException(
+                    $"Elasticsearch responded with {deleteResponse.DebugInformation} " +
+                    $"when attempting to delete transient index: {indexName}");
+            }
         }
-
-        await PersistAndPublish(run, payload, ct);
+        catch (OperationCanceledException)
+        {
+            /* transient-index delete is best-effort; cancellation is expected */
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Failed to delete transient dry-run index '{IndexName}'; manual cleanup may be required", indexName);
+        }
     }
 
-    private async Task PersistAndPublish(IngestRun run, IngestEventPayload payload, CancellationToken ct)
+    // Reloads from the database so the runner defers to a terminal already recorded by the cancel endpoint instead
+    // of overwriting it.
+    private async Task<bool> StillActiveAsync(IngestRun run)
     {
-        _logger.LogInformation("{@IngestEvent}", payload);
+        await db.Entry(run).ReloadAsync(CancellationToken.None);
+        await db.Entry(run).Collection(r => r.Phases).LoadAsync(CancellationToken.None);
+        return !run.IsTerminal;
+    }
 
-        if (_logger.IsEnabled(LogLevel.Debug) && payload is IngestEventPayload.IWithSnapshot withSnapshot)
-        {
-            _logger.LogDebug("{IngestReportSnapshotPretty}", withSnapshot.Snapshot.PrettyPrint());
-        }
-
-        IngestRunEvent evt = await db.AppendAsync(run, payload, ct);
+    private async Task SaveAsync(IngestRun run, CancellationToken ct)
+    {
+        _logger.LogInformation("Ingest {RunId}: {Phase}", run.Id, run.CurrentProgress.GetType().Name);
         await db.SaveChangesAsync(ct);
-
-        broadcaster.Publish(new IngestProgressEvent(run.Id, evt.Seq, evt.At, payload));
     }
 
-    private IngestReportSnapshot Snapshot() => new(
-        TotalToProduce,
-        Elapsed,
-        PercentComplete,
-        DocsPerSecond,
-        EstimatedRemaining,
-        Produced,
-        GC.GetTotalMemory(false),
-        Environment.WorkingSet,
-        DateTimeOffset.UtcNow);
+    private IngestProgress Progress(IngestCheckpoint checkpoint, object? metadata = null)
+    {
+        _checkpoint = checkpoint;
+        return new IngestProgress
+        {
+            Checkpoint = checkpoint,
+            TotalToProduce = TotalToProduce,
+            Elapsed = Elapsed,
+            PercentComplete = PercentComplete,
+            DocsPerSecond = DocsPerSecond,
+            EstimatedRemaining = EstimatedRemaining,
+            Produced = Produced,
+            ManagedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false),
+            WorkingMemoryBytes = Environment.WorkingSet,
+            Metadata = metadata is null
+                ? JsonDocument.Parse("{}")
+                : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
+        };
+    }
 }

@@ -3,6 +3,8 @@
 
 using System.Security.Authentication;
 using Dse.Data;
+using Dse.Ingestion;
+using Dse.Ingestion.Events;
 using Dse.Shared;
 using Humanizer;
 using JasperFx;
@@ -28,18 +30,28 @@ public static class MessagingExtensions
 
             opts.ServiceName = builder.Environment.ApplicationName;
             opts.ApplicationAssembly = typeof(MessagingExtensions).Assembly;
-            opts.Durability.Mode = DurabilityMode.Balanced; // F5 Load balanced
+
+            // Single always-on pod: this node owns all durability work directly. Solo skips leader election and
+            // distributed node-agent assignment — the machinery that, under Balanced, floods the log trying to hand
+            // agents to ghost node rows. Switch to Balanced for true multi-node on the shared SQL Server store.
+            opts.Durability.Mode = DurabilityMode.Solo;
             opts.MultipleHandlerBehavior = MultipleHandlerBehavior.Separated;
             opts.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
 
             opts.PersistMessagesWithSqlite(builder.Configuration.GetSqliteConnectionString());
             opts.UseEntityFrameworkCoreTransactions();
             opts.UseEntityFrameworkCoreWolverineManagedMigrations();
+            opts.PublishDomainEventsFromEntityFrameworkCore<IEntity>(x => x.Events);
 
             opts.Policies.AutoApplyTransactions();
             opts.Policies.UseDurableLocalQueues();
             opts.Policies.UseDurableInboxOnAllListeners();
             opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+            // Ingest execution: durable, and one run at a time so a source is never crawled by two runs at once.
+            // The handler raises its own timeout past the 60s default; single-node today, exclusive-node when we
+            // move to a shared SQL Server store.
+            opts.LocalQueueFor<IngestRunCreatedEvent>().Sequential();
 
             opts.Policies
                 .OnException<ConcurrencyException>()
@@ -64,7 +76,8 @@ public static class MessagingExtensions
                 .MoveToErrorQueue();
         });
 
-        builder.Services.AddHealthChecks()
+        builder.Services
+            .AddHealthChecks()
             .AddWolverine(tags: ["live", "ready"])
             .AddWolverineListeners(tags: ["ready"]);
     }

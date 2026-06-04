@@ -18,7 +18,7 @@ public sealed class SourcesValidatorTests
     [Fact]
     public async Task StartAsync_WithOneModule_Succeeds()
     {
-        SourcesValidator validator = Validator(new ConfluenceModule());
+        SourcesValidator validator = Validator(new Dse.Sources.Confluence.Confluence());
         Func<Task> fn = async () =>
         {
             await validator.StartAsync(Ct); // completes without throwing
@@ -39,7 +39,7 @@ public sealed class SourcesValidatorTests
     public async Task StartAsync_WithDuplicateKeys_Throws()
     {
         // Two Confluence modules share the "confluence" key — a misconfiguration the validator must catch.
-        Func<Task> act = () => Validator(new ConfluenceModule(), new ConfluenceModule()).StartAsync(Ct);
+        Func<Task> act = () => Validator(new Dse.Sources.Confluence.Confluence(), new Dse.Sources.Confluence.Confluence()).StartAsync(Ct);
 
         (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("Duplicate source keys");
     }

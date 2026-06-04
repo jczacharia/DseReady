@@ -11,13 +11,13 @@ namespace Dse.Auth;
 
 public sealed class DevAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
-    DseEnv dseEnv,
+    IDseEnvironment dseEnv,
     ILoggerFactory logger,
     UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (dseEnv is not { LocalCredentials.Username: { } username })
+        if (dseEnv is not IDseLocalEnvironment { Username: { } username })
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }

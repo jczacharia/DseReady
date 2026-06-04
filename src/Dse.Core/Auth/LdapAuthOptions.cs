@@ -33,14 +33,14 @@ public static class LdapAuthExtensions
     {
         services
             .AddFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Ad)
-            .PostConfigure<DseEnv>((options, env) =>
+            .PostConfigure<IDseEnvironment>((options, env) =>
             {
                 options.Host = options.Host.Or("pncbank.com");
 
-                if (env is { LocalCredentials: { } lc })
+                if (env is IDseLocalEnvironment localEnv)
                 {
-                    options.BindDn = options.BindDn.Or($"{lc.Username}@{options.Host}");
-                    options.BindPassword = options.BindPassword.Or(lc.Password);
+                    options.BindDn = options.BindDn.Or($"{localEnv.Username}@{options.Host}");
+                    options.BindPassword = options.BindPassword.Or(localEnv.Password);
                 }
 
                 options.SearchBase = options.SearchBase.Or("DC=pncbank,DC=com");
@@ -58,17 +58,19 @@ public static class LdapAuthExtensions
     {
         services
             .AddFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Oud)
-            .PostConfigure<DseEnv>((options, env) =>
+            .PostConfigure<IDseEnvironment>((options, env) =>
             {
-                options.Host = options.Host.Or(env switch
-                {
-                    DseEnv.Rnd => "mdsemp-rnd.pncint.net",
-                    DseEnv.Uat => "mdsemp-uat.pncint.net",
-                    DseEnv.Qa => "mdsemp-qa.pncint.net",
-                    _ => "mdsemp.pncint.net",
-                });
+                options.Host = options.Host.Or(env is IDseDeploymentEnvironment de
+                    ? de.Deployment switch
+                    {
+                        DeploymentEnvironment.Rnd => "mdsemp-rnd.pncint.net",
+                        DeploymentEnvironment.Uat => "mdsemp-uat.pncint.net",
+                        DeploymentEnvironment.Qa => "mdsemp-qa.pncint.net",
+                        _ => "mdsemp.pncint.net",
+                    }
+                    : "mdsemp.pncint.net");
 
-                if (env is { LocalCredentials: { } lc })
+                if (env is IDseLocalEnvironment lc)
                 {
                     options.BindDn = options.BindDn.Or($"cn={lc.Username},ou=Employees,ou=People,o=pnc");
                     options.BindPassword = options.BindPassword.Or(lc.Password);

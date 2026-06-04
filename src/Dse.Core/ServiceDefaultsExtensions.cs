@@ -1,16 +1,16 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 using Dse.Data;
 using Dse.ES;
+using Dse.Ingestion;
 using Dse.Messaging;
 using Dse.Shared;
 using Dse.Sources;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +21,8 @@ using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Weasel.Core;
+using Weasel.Sqlite;
 
 namespace Dse;
 
@@ -33,18 +35,23 @@ public static class ServiceDefaultsExtensions
             builder.Configuration.AddUserSecrets("dse");
         }
 
-        builder.Services.AddDseEnv(builder.Configuration, builder.Environment);
-        builder.Services.AddElastic();
-        builder.AddData();
+        builder.Services.AddDseEnvironment();
+        builder.Services.AddHostedService<SourcesValidator>();
+
+        builder.AddDataContext();
+        builder.Services.AddSingleton<Migrator, SqliteMigrator>();
+
         builder.AddMessaging();
 
-        builder.Services.AddSourceInitializers();
+        builder.Services.AddHostedService<DataMigrator>();
+
+        builder.Services.AddElastic();
+        builder.AddIngestion();
 
         builder.Services.AddProblemDetails(static s => s.ApplyCoreCustomization());
         builder.Services.ConfigureHttpClientDefaults(static o => o.RemoveAllLoggers());
         builder.Services.ConfigureHttpJsonOptions(static o => o.SerializerOptions.Converters.Add(JsonDefaults.Thinktecture));
 
-        builder.Services.AddEndpoints([typeof(ServiceDefaultsExtensions).Assembly]);
         builder.Services.AddMemoryCache();
         builder.Services.AddServiceDiscovery();
 
@@ -116,64 +123,38 @@ public static class ServiceDefaultsExtensions
     private static void AddDefaultHealthChecks(this IHostApplicationBuilder builder) =>
         builder.Services.AddHealthChecks().AddCheck("self", static () => HealthCheckResult.Healthy(), ["live"]);
 
-    public static RouteGroupBuilder MapDefaultEndpoints(this IEndpointRouteBuilder routeBuilder)
+    public static RouteGroupBuilder MapDefaultHealthChecks(
+        this IEndpointRouteBuilder routeBuilder,
+        [StringSyntax("Route")] string pattern = "")
     {
-        RouteGroupBuilder healthChecks = routeBuilder.MapGroup("");
+        RouteGroupBuilder healthChecks = routeBuilder.MapGroup(pattern);
 
-        healthChecks.MapHealthChecks("/live", new HealthCheckOptions
+        healthChecks.MapHealthChecks("live", new HealthCheckOptions
         {
             Predicate = static r => r.Tags.Contains("live"),
         });
 
-        healthChecks.MapHealthChecks("/ready", new HealthCheckOptions
+        healthChecks.MapHealthChecks("ready", new HealthCheckOptions
         {
             Predicate = static r => r.Tags.Contains("ready"),
         });
 
-        healthChecks.MapHealthChecks("/health", new HealthCheckOptions
-        {
-            ResponseWriter = WriteHealthReport,
-        });
+        healthChecks.MapHealthChecks("health", new HealthCheckOptions().WithReportWriter());
 
-        healthChecks.MapHealthChecks("/health/sources", new HealthCheckOptions
+        healthChecks.MapHealthChecks("health/sources", new HealthCheckOptions
         {
             Predicate = static r => r.Tags.Contains("source"),
-            ResponseWriter = WriteHealthReport,
-        });
+        }.WithReportWriter());
 
         var healthOpts = routeBuilder.ServiceProvider.GetRequiredService<IOptions<HealthCheckServiceOptions>>();
         foreach (string name in healthOpts.Value.Registrations.Select(r => r.Name))
         {
-            healthChecks.MapHealthChecks($"/health/{name}", new HealthCheckOptions
+            healthChecks.MapHealthChecks($"health/{name}", new HealthCheckOptions
             {
                 Predicate = r => r.Name == name,
-                ResponseWriter = WriteHealthReport,
-            });
+            }.WithReportWriter());
         }
 
         return healthChecks;
-    }
-
-    private static async Task WriteHealthReport(HttpContext context, HealthReport report)
-    {
-        string result = JsonSerializer.Serialize(
-            new
-            {
-                status = report.Status.ToString(),
-                totalDuration = report.TotalDuration.ToString(),
-                checks = report.Entries.Select(e => new
-                {
-                    name = e.Key,
-                    status = e.Value.Status.ToString(),
-                    duration = e.Value.Duration.ToString(),
-                    description = e.Value.Description,
-                    exception = e.Value.Exception?.Message,
-                    data = e.Value.Data,
-                }),
-            },
-            JsonDefaults.Pretty);
-
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync(result);
     }
 }

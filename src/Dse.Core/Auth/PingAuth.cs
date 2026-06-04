@@ -20,7 +20,7 @@ public static class PingAuthDefaults
 }
 
 [ExcludeFromCodeCoverage]
-internal class ConfigurePingJwtBearerOptions(DseEnv env) : IConfigureNamedOptions<JwtBearerOptions>
+internal class ConfigurePingJwtBearerOptions(IDseEnvironment env) : IConfigureNamedOptions<JwtBearerOptions>
 {
     public void Configure(string? name, JwtBearerOptions options)
     {
@@ -29,13 +29,17 @@ internal class ConfigurePingJwtBearerOptions(DseEnv env) : IConfigureNamedOption
             return;
         }
 
-        string metadataAddress = env switch
-        {
-            DseEnv.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
-            DseEnv.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
-            DseEnv.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
-            _ => "https://wfsso-apps.pnc.com/.well-known/openid-configuration",
-        };
+        const string defaultUrl = "https://wfsso-apps.pnc.com/.well-known/openid-configuration";
+
+        string metadataAddress = env is IDseDeploymentEnvironment de
+            ? de.Deployment switch
+            {
+                DeploymentEnvironment.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
+                DeploymentEnvironment.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
+                DeploymentEnvironment.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
+                _ => defaultUrl,
+            }
+            : defaultUrl;
 
         options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
             metadataAddress,

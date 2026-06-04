@@ -1,0 +1,169 @@
+
+[
+	{
+	             "_index": "source-confluence-2026.05.27.065649",
+	             "_id": "2063102569",
+	             "_score": 661.2304,
+	             "_source": {
+	                 "versionWhen": "2025-12-10T10:39:08-05:00",
+	                 "type": "page",
+	                 "title": "CyberArk Links",
+	                 "body": "Name Link Description/Instruction CyberArk CyberArk PVS Password Vault (pncint.net) CyberArk RPV Link https://rpv.pncint.net/PasswordVault/logon.aspx?ReturnUrl=%2fPasswordVault%2fdefault.aspx CyberArk AAM PROD https://aam.pncint.net/PasswordVault/v10/logon/radius CyberArk AAM QA https://aam-qa.pncint.net/PasswordVault/v10/logon/ldap CyberArk AAM UAT https://aam1-uat.pncint.net/PasswordVault/v10/logon/ldap CyberArk AAM RND https://aam1-rnd.pncint.net/PasswordVault/v10/logon/ldap Confluence & Wiki Pages CyberArk FAQ CyberArk Troubleshooting (pnc.com) PAM Wiki Page Privileged Access Management Tool (pnc.com) PVS Wiki Page Password Vaulting System (PVS) (pnc.com) AAM Wiki Application Access Manager (AAM) (pnc.com) AAM Confluence https://confluence.pncint.net/display/CET/CyberArk+Application+Access+Manager+-+Automated+Enterprise+Integration+Pattern SA ID Wiki Page Secondary Account (SA) ID (pnc.com) Secrets Broker https://confluence.pncint.net/display/SRE1/Secrets+Broker+-+Customer+Information Managed Service Accounts (MSA) Shared Group Managed Service Accounts - L4 Windows Support - Confluence (pncint.net) Managed Service Accounts (MSA) Documentation Managed Service Account Documentation - Cruise - Confluence (pncint.net) Tools JIRA (Keymasters) https://jira.pncint.net/projects/KEY/issues/KEY-1?filter=allopenissues Tableu Non-Compliant Report LOB Risk Matrix Compliance Breakdown: Currently_NonCompliant_InCA - Tableau Server (pncint.net) CIR Reports https://cirpo.pncint.net/site/start.htm Datagaurd \"Cyberark - Database Service Report\" - Oracle Enterprise Manager (pncint.net) Compliance Matrix CyberArk Control Matrix Mapping (Compliance Matrix Exception List (Allowed Machines) Exceptions List for Allowed Machines Sync - CyberArk Engineering Team - Keymasters - Confluence (pncint.net) PTA (SOC) Threat (Disabled List) Privileged Threat Analytics (PTA) Disabled Access Tracking - All Items (pncint.net) Hard Coded Credentials Flow Chart Hard-Coded Password Decision Flowchart.pdf (pncint.net) OIM Self-Serve (Use to reset non-prod passwords) Self Service (pnc.com) Job Aids CyberArk Authentication ​​Sign In to (and Out of) CyberArk job aid CyberArk Reporting CyberArk Reporting Job Aid​ SA ID Request (and Remove) a Secondary Account (SA ID) PINGID Ping Ide​ntity (ID) Soft Token Setup for CyberArk job aid",
+	                 "space": {
+	                     "name": "CyberArk Ops",
+	                     "link": "/spaces/CYOPS/overview",
+	                     "id": 2070347783,
+	                     "key": "CYOPS"
+	                 },
+	                 "versionNumber": 1,
+	                 "versionBy": {
+	                     "displayName": "Cathy Piasente",
+	                     "userKey": "8aa4c5d46f1ef2e3016fa54a0453004a",
+	                     "username": "PL38004",
+	                     "profilePicturePath": "/download/attachments/141073608/user-avatar"
+	                 },
+	                 "labels": [],
+	                 "createdDate": "2025-12-10T10:39:08-05:00",
+	                 "createdBy": {
+	                     "displayName": "Cathy Piasente",
+	                     "userKey": "8aa4c5d46f1ef2e3016fa54a0453004a",
+	                     "username": "PL38004",
+	                     "profilePicturePath": "/download/attachments/141073608/user-avatar"
+	                 },
+	                 "id": "2063102569",
+	                 "ancestors": [
+	                     {
+	                         "link": "/spaces/CYOPS/pages/2063487804/CyberArk+Ops+Home",
+	                         "id": "2063487804",
+	                         "type": "page",
+	                         "title": "CyberArk Ops Home"
+	                     },
+	                     {
+	                         "link": "/spaces/CYOPS/pages/2063102549/CyberArk+Operations",
+	                         "id": "2063102549",
+	                         "type": "page",
+	                         "title": "CyberArk Operations"
+	                     }
+	                 ],
+	                 "batchIndexDate": "2026-05-27T07:01:37.8769138+00:00",
+	                 "hash": "2025c67fb0f7d358"
+	             },
+	             "highlight": {
+	                 "title": [
+	                     "<mark>CyberArk</mark> Links"
+	                 ],
+	                 "body": [
+	                     "/PasswordVault/v10/logon/<mark>ldap</mark> <mark>CyberArk</mark> AAM UAT https://aam1-uat.pncint.net/PasswordVault/v10/logon/<mark>ldap</mark> <mark>CyberArk</mark> AAM RND https://aam1-rnd.pncint.net/PasswordVault",
+	                     "/v10/logon/<mark>ldap</mark> Confluence & Wiki Pages <mark>CyberArk</mark> FAQ <mark>CyberArk</mark> Troubleshooting (pnc.com) PAM Wiki Page Privileged Access Management Tool (pnc.com) PVS Wiki",
+	                     "Name Link Description/Instruction <mark>CyberArk</mark> <mark>CyberArk</mark> PVS Password Vault (pncint.net) <mark>CyberArk</mark> RPV Link https://rpv.pncint.net/PasswordVault/logon.aspx?",
+	                     "Authentication ​​Sign In to (and Out of) <mark>CyberArk</mark> job aid <mark>CyberArk</mark> Reporting <mark>CyberArk</mark> Reporting Job Aid​ SA ID Request (and Remove) a Secondary Account",
+	                     "ReturnUrl=%2fPasswordVault%2fdefault.aspx <mark>CyberArk</mark> AAM PROD https://aam.pncint.net/PasswordVault/v10/logon/radius <mark>CyberArk</mark> AAM QA https://aam-qa.pncint.net"
+	                 ]
+	             },
+	             "inner_hits": {
+	                 "matched_labels": {
+	                     "hits": {
+	                         "total": {
+	                             "value": 0,
+	                             "relation": "eq"
+	                         },
+	                         "max_score": null,
+	                         "hits": []
+	                     }
+	                 },
+	                 "matched_ancestors": {
+	                     "hits": {
+	                         "total": {
+	                             "value": 0,
+	                             "relation": "eq"
+	                         },
+	                         "max_score": null,
+	                         "hits": []
+	                     }
+	                 }
+	             }
+	         },
+	         {
+	             "_index": "source-confluence-2026.05.27.065649",
+	             "_id": "2063102568",
+	             "_score": 548.7667,
+	             "_source": {
+	                 "versionWhen": "2025-12-10T10:39:08-05:00",
+	                 "type": "page",
+	                 "title": "CyberArk Knowledge Base",
+	                 "body": "Error Description Instructions CyberArk CyberArk - suspended contact system administrator User is unable to Login/Authenticate into CyberArk. Remove password violations from \"PrivateArk\". Authentication failure for User [PNCID] If getting this error for CyberArk PVS. Confirm the user has the first entitlement below PVS.Password Vaulting System - Privileged User If authenticating to CyberArk with PINGID, the entitlement below is required. PVS.PING Two Factor Authentication (Prod) Oracle CyberArk Errors Failed to read from third party log file. Error: invalid log line format This is a general communications error. It usually means there is some issue on the Oracle end, but may be an issue in CyberArk. First check for any typos in the account setup. Then try a reconcile, and if this does not work, involve the “Service Operations Oracle Support” assignment group to check out the account on the Oracle side. They will need to investigate, and need an INC. One possibility is the EID account does not exist on that database, however the Oracle team must investigate as it could be different database problems. Failed to Serialize String error If a “failed to serialize string” error shows for an EID. Try a Reconcile. Then check the PVSRECON account. If the PVSRECON account is getting the same error, have the Oracle team reset the password, and that password will need to be entered into CyberArk as only in the vault. Then perform a CPM change for PVSRECON. Error in reading xml file E:\\Program Files (x86) This error usually occurs when there is not a reconcile account associated. Check that there is a reconcile account associated to the account and associate as needed. Error while creating extra passwords section - Safe not found The \"Safe not found\" part of the error, is a tip off that this is a CPM mismatch. There is likely a mismatch between the EID account PVSrecon account CPM, and the CPM on the safe housing the EID. For example, if the PVSRecon account is in an AB0 safe, the EID account must also be in a standard Oracle EID safe. Error \": 0\" If getting an “: 0” error, which kind of looks like a surprised face because we are surprised to receive this error, have the Oracle team reset the EID password as needed. ******* error If getting an error with a lot of asterisks in it (the * character). Check the account’s PVSRECON account for the database by running a Verify, and if that works then a CPM Change. If those things do not work have the Oracle team reset the PVSRECON password as needed. Then fix the EID account with a Reconcile. A forbidden character was found in the new target password parameter If receiving this error, it means that CyberArk is sending certain characters that are being re-interpreted as commands. These characters can be excluded from CyberArk’s push. Check “PasswordForbiddenCharacters” and “CommandForbiddenCharacters” at the platform level, but do not make any changes without consulting with Engineering first, asking what we should do, if anything. OUD CyberArk Errors Execution error. EXT01::Reconcile Account - Object does not exist. Error code:8016 This error means that the UserDN is different, or account does not exist in OUD. Confirm both the User DN and account exists with the requestor. Execution error. EXT01::Not enough Arguments This means that there is likely a problem with the OUD account itself, CyberArk cannot interact with it. Likely this is due to “exe” being in the name. CyberArk cannot manage an OUD account if it has “exe” anywhere in the name. See the top of this document for more info on “exe” being in the account name. This could also be a different issue with CyberArk, make sure the account is added correctly to CyberArk then investigate with Engineering. Execution error. EXT01::Cannot contact the LDAP server If an error of “Execution error. EXT01::Cannot contact the LDAP server. Make sure that the address and port are correct. Error code:2104” occurs, then check the spelling of the Username, Address, and UserDN fields. This error usually means there is a misspelling somewhere in one of those fields. Midrange CyberArk Errors Account won’t reconcile If getting any errors for a Unix/Linux account. First make sure the “pvsrecon” account is in good standing, as it’s required for a successful Reconcile. Fix Pvsrecon as needed, work with the Midrange team (CSO - BUS - WIAM - Midrange Security) as needed. Root account won’t reconcile If encountering a “root” account that will not reconcile, and “pvsrecon” is good. The root account will likely need to be reset on the server itself. A Midrange Security team (CSO - BUS - WIAM - Midrange Security) member will need to check out the “root” account. Root account or Xapvsar0 doesn’t exist If the “root” account and “xapvsar0” accounts needed for Unix don’t exist in CyberArk. The Midrange Security team (CSO - BUS - WIAM - Midrange Security) will need to run their automation processes to board them. After this, then we can add other accounts as normal. Execution error. Error: Invalid prompt or did not receive any prompt. State: \"LoginPass\". code: 7001 For any errors about Prompts, This likely means that the “login prompt/message of the day/bash profile” for the account on the Linux server itself was customized, as in a “custom prompt”. CyberArk cannot interface with custom prompts; the prompts must be default. Ask the Midrange Security (CSO - BUS - WIAM - Midrange Security) team to revert the prompt back to default, and then we test reconcile the account. No such user [username] If getting an error “no such user [username]” but the account exists as the Midrange Security team (CSO - BUS - WIAM - Midrange Security) created it. Then check the capitalization and spelling on the username. In Unix and Linux, account names must match exact capitalization. If the boarding request is from Midrange Security team (CSO - BUS - WIAM - Midrange Security), check their RITM notes for the account name they made. Error code:-1 This usually indicates the specified account does not exist on the Unix server. Confirm with the Midrange Security team (CSO - BUS - WIAM - Midrange Security) if the account exists on the specified Unix server as needed. Execution error. EXT01::Did not find any matching prompt for…: This likely means that the “login prompt/message of the day/bash profile” for the account on the Linux server itself was customized, as in a “custom prompt”. CyberArk cannot interface with custom prompts; the prompts must be default. Ask the Midrange Security team (CSO - BUS - WIAM - Midrange Security) to revert the prompt back to default, and then test reconcile the account. Execution error. EXT01::Permission denied (password). Error code:2114 This likely indicates the account is locked on the Unix server itself outside of CyberArk, OR rarely there is also a prompts issue. Try a Reconcile. If that doesn’t work, make sure the Reconcile account is in good standing. 3. If we still can’t Reconcile it, send the INC to Midrange Security (CSO - BUS - WIAM - Midrange Security) team to unlock the account, and to check for any nonstandard prompts. In the notes, ask them to send back to the CyberArk team when unlocked. Reconcilepass password process terminated. Timeout (240) elapsed If the account times out and will not reconcile, check the following CACPM336E reconcilepass password process terminated. Timeout (240) elapsed: If the account times out and will not reconcile, check the following: A. Make sure the PVSrecon account assigned to the account is in good standing. B. Make sure the username has correct capitalization, it must match the account on the Unix/Linux server, not the user’s RITM request. Accounts in Unix/Linux are nearly always in lowercase, with no capitals for any letter. C. If account still will not reconcile, make an INC for account investigation to the Midrange Security (CSO - BUS - WIAM - Midrange Security) team. They will need to check the account on the Linux server itself for: · Account is not a “nologin” account. · Account is not expired. · Account is not locked. · Other issues that would make the account unusual in some way.",
+	                 "space": {
+	                     "name": "CyberArk Ops",
+	                     "link": "/spaces/CYOPS/overview",
+	                     "id": 2070347783,
+	                     "key": "CYOPS"
+	                 },
+	                 "versionNumber": 1,
+	                 "versionBy": {
+	                     "displayName": "Cathy Piasente",
+	                     "userKey": "8aa4c5d46f1ef2e3016fa54a0453004a",
+	                     "username": "PL38004",
+	                     "profilePicturePath": "/download/attachments/141073608/user-avatar"
+	                 },
+	                 "labels": [],
+	                 "createdDate": "2025-12-10T10:39:08-05:00",
+	                 "createdBy": {
+	                     "displayName": "Cathy Piasente",
+	                     "userKey": "8aa4c5d46f1ef2e3016fa54a0453004a",
+	                     "username": "PL38004",
+	                     "profilePicturePath": "/download/attachments/141073608/user-avatar"
+	                 },
+	                 "id": "2063102568",
+	                 "ancestors": [
+	                     {
+	                         "link": "/spaces/CYOPS/pages/2063487804/CyberArk+Ops+Home",
+	                         "id": "2063487804",
+	                         "type": "page",
+	                         "title": "CyberArk Ops Home"
+	                     },
+	                     {
+	                         "link": "/spaces/CYOPS/pages/2063102549/CyberArk+Operations",
+	                         "id": "2063102549",
+	                         "type": "page",
+	                         "title": "CyberArk Operations"
+	                     }
+	                 ],
+	                 "batchIndexDate": "2026-05-27T07:01:37.8694877+00:00",
+	                 "hash": "2025c67fb0f7d358"
+	             },
+	             "highlight": {
+	                 "title": [
+	                     "<mark>CyberArk</mark> Knowledge Base"
+	                 ],
+	                 "body": [
+	                     "EXT01::Cannot contact the <mark>LDAP</mark> server If an error of “Execution error. EXT01::Cannot contact the <mark>LDAP</mark> server.",
+	                     "Error Description Instructions <mark>CyberArk</mark> <mark>CyberArk</mark> - suspended contact system administrator User is unable to Login/Authenticate into <mark>CyberArk</mark>.",
+	                     "This could also be a different issue with <mark>CyberArk</mark>, make sure the account is added correctly to <mark>CyberArk</mark> then investigate with Engineering.",
+	                     "Authentication failure for User [PNCID] If getting this error for <mark>CyberArk</mark> PVS.",
+	                     "<mark>CyberArk</mark> cannot interface with custom prompts; the prompts must be default."
+	                 ]
+	             },
+	             "inner_hits": {
+	                 "matched_labels": {
+	                     "hits": {
+	                         "total": {
+	                             "value": 0,
+	                             "relation": "eq"
+	                         },
+	                         "max_score": null,
+	                         "hits": []
+	                     }
+	                 },
+	                 "matched_ancestors": {
+	                     "hits": {
+	                         "total": {
+	                             "value": 0,
+	                             "relation": "eq"
+	                         },
+	                         "max_score": null,
+	                         "hits": []
+	                     }
+	                 }
+	             }
+	         }
+]

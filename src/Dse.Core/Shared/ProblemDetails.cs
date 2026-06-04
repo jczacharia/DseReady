@@ -71,18 +71,21 @@ public static class ProblemDetailsExtensions
         if (context.HttpContext.Response is { StatusCode: StatusCodes.Status404NotFound, HasStarted: false })
         {
             context.ProblemDetails.Detail = "The requested resource was not found.";
+            context.ProblemDetails.Extensions["Path"] = context.HttpContext.Request.Path;
         }
     };
 
+    public static void SetProblem(this HttpContext httpContext, ProblemDetails problem) =>
+        httpContext.Items[HttpContextKey] = problem;
+
     public static void SetProblem(this HttpContext httpContext, HttpStatusCode statusCode, string title, string detail) =>
-        httpContext.Items[HttpContextKey] = new ProblemDetails
+        httpContext.SetProblem(new ProblemDetails
         {
             Instance = httpContext.Request.Path,
             Title = title,
             Detail = detail,
             Status = (int)statusCode,
-        };
-
+        });
 
     public static ProblemHttpResult ProblemHttpResult(
         this HttpContext httpContext,

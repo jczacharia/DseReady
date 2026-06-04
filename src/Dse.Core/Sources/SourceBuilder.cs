@@ -11,7 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Dse.Sources;
 
-public sealed class SourceBuilder
+public sealed class SourceBuilder<TDoc> where TDoc : class
 {
     private readonly SourceModule _module;
 
@@ -22,43 +22,47 @@ public sealed class SourceBuilder
         Services.AddSingleton(module);
         Services.AddSingleton(module.SourceKey);
         Services.AddKeyedSingleton(module.SourceKey, module);
-        Services.AddEndpoints([module.Assembly]);
         Services.AddKeyedSingleton<ElasticsearchTypeContext>(module.SourceKey, (sp, _) =>
         {
-            var env = sp.GetRequiredService<DseEnv>();
+            var env = sp.GetRequiredService<IDseEnvironment>();
             ElasticsearchTypeContext typeContext = module.GetTypeContext(env);
-            return env switch
+            string aliasFormat = typeContext.ResolveAliasFormat();
+
+            if (env.IsTest() && !aliasFormat.StartsWith("test-"))
             {
-                DseEnv.Test when !typeContext.ResolveAliasFormat().StartsWith("test-") => throw new InvalidOperationException(
-                    $"Source module {module.GetType().Name} returned a non-test alias format in a test environment. Alias format must start with 'test-'."),
-                not DseEnv.Test when !typeContext.ResolveAliasFormat().StartsWith("source-") => throw new
-                    InvalidOperationException(
-                        $"Source module {module.GetType().Name} returned a non-source alias format in a non-test environment. Alias format must start with 'source-'."),
-                _ => typeContext,
-            };
+                throw new InvalidOperationException(
+                    $"Source module {module.GetType().Name} returned a non-test alias format in a test environment."
+                    + $" Alias format must start with 'test-'.");
+            }
+
+            if (!env.IsTest() && !aliasFormat.StartsWith("source-"))
+            {
+                throw new InvalidOperationException(
+                    $"Source module {module.GetType().Name} returned a non-source alias format in a non-test environment."
+                    + $" Alias format must start with 'source-'.");
+            }
+
+            return typeContext;
         });
     }
 
     public IServiceCollection Services { get; }
     public SourceKey SourceKey => _module.SourceKey;
 
-    /// <summary>Wire the source's ingest pipeline: broadcaster, <see cref="IIngest{TDoc}" />, keyed runner.</summary>
-    public void AddIngestion<TDoc, TIngest>()
-        where TDoc : class
+    public void AddIngestion<TIngest>()
         where TIngest : class, IIngest<TDoc>
     {
-        Services.TryAddSingleton<IngestProgressBroadcaster>();
         Services.AddScoped<IIngest<TDoc>, TIngest>();
         Services.AddKeyedScoped<IIngestRunner, IngestRunner<TDoc>>(SourceKey);
     }
 
-    public void AddIngestStrategy<TDoc, TIngest>()
-        where TDoc : class
-        where TIngest : class, IIngestStrategy<TDoc> => Services.AddSingleton<IIngestStrategy<TDoc>, TIngest>();
+    public void AddIngestStrategy<TIngest>() where TIngest : class, IIngestStrategy<TDoc> =>
+        Services.AddSingleton<IIngestStrategy<TDoc>, TIngest>();
 
-    public void AddHealthCheck<TCheck>() where TCheck : class, IHealthCheck
+    public void AddHealthCheck<TCheck>(HealthStatus status = HealthStatus.Degraded, TimeSpan? timeout = null)
+        where TCheck : class, IHealthCheck
     {
         string key = SourceKey.ToString();
-        Services.AddHealthChecks().AddCheck<TCheck>(key, HealthStatus.Degraded, ["source", key], TimeSpan.FromSeconds(8));
+        Services.AddHealthChecks().AddCheck<TCheck>(key, status, ["source", key], timeout ?? TimeSpan.FromSeconds(8));
     }
 }

@@ -12,13 +12,6 @@ public sealed record SignalREnvelope(object Payload, string[] UserIds)
     public string Type => Payload.GetType().Name;
 }
 
-public abstract record SignalRMessage
-{
-    public string Type => GetType().Name;
-}
-
-public sealed record CaseAssetReportUpdated(Guid CaseId, string AssetReportId) : SignalRMessage;
-
 public static class SignalRMessageHandler
 {
     public static async Task Handle(SignalREnvelope envelope, IHubContext<MessagingHub> hubContext) =>

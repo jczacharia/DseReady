@@ -11,7 +11,6 @@ public static class SourceExtensions
 {
     public static void AddSourceInitializers(this IServiceCollection services)
     {
-        services.AddHostedService<SourcesValidator>();
-        services.AddInitialData<DataContext, SourceDataInitializer>();
+
     }
 }

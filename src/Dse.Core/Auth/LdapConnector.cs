@@ -12,7 +12,7 @@ namespace Dse.Auth;
 public sealed class LdapConnector(string name, IServiceProvider services) : IDisposable
 {
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();
-    private readonly DseEnv _env = services.GetRequiredService<DseEnv>();
+    private readonly IDseEnvironment _env = services.GetRequiredService<IDseEnvironment>();
     private readonly IOptionsMonitor<LdapAuthOptions> _monitor = services.GetRequiredService<IOptionsMonitor<LdapAuthOptions>>();
     private readonly SemaphoreSlim _semaphore = new(initialCount: 1, maxCount: 1);
     private LdapConnection? _connection;
@@ -35,7 +35,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
             {
                 LdapConnectionOptions ldapOpts = new LdapConnectionOptions().UseSsl();
 
-                if (!_env.IsDeployment)
+                if (_env is IDseLocalEnvironment)
                 {
                     ldapOpts = ldapOpts.ConfigureRemoteCertificateValidationCallback((_, _, _, _) => true);
                 }

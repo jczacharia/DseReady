@@ -1,0 +1,493 @@
+PART 1
+CSPPR-5705 - (  )
+
+Purpose: "This page serves as a reference to the research done for the approaches to inject CyberArk Secrets into OpenShift.
+
+SPIKE Objectives:
+Determine the level of effort required to implement secret injection into OpenShift from CyberArk.
+Create a card for implementation for each environment: QA, UAT, and PROD. (the spike can be promoted to DEV if successful)
+Documentation on approach is in Confluence.
+If the below documentation is sufficient, we can simply link / clone the existing documentation from our own docs
+Documentation on approach for Azure key auto-rotation is in confluence (or documentation on the limitations that might make this difficult).
+Should reach out to CyberArk Team to check in if CyberArk is configured for this already
+Create a Spike card to research CyberArk Secret management again when we have secrets that need updated regularly?
+Timeboxtimer clock: 5 days - Make this match the ticket to keep yourself and your expectations for outcomes in check.
+
+Desired Outcome: ( Make a Decision | Proof of Concept | etc... ) - Make documentation on the approaches to inject CyberArk Secrets (this page).
+
+Research & Discovery
+Links:
+
+CyberArk OCP Secrets Pipeline - This is the documentation that lays out how to update the manifest.yaml file for deploying secrets.
+
+CIR / cir-secrets-deploy - This is an example secrets repo that Todd Komlenic demo'd for us. It follows the CyberArk OCP Secrets Pipeline deployment guide to create a secret in the corresponding OCP environment.
+
+Vangala, Bhaskarareddy: CDO - Migrating to HELM - As of 11/1/2024 Secrets are not being managed by the new helm release process, and we would need to follow the above approach.
+
+PNC Developers Guide to Secrets Management - This lays out the various approaches that PNC uses to secure secrets, including using CyberArk AAM with Conjur for runtime secret ingestion inside of OCP.
+
+Contacts:
+
+Don Keister
+
+Todd Komlenic
+
+Zachary Zando
+
+Option #1
+The easiest way to move forward is to use the following pattern:
+
+azs-secrets-deploy - Create a new repo that is effectively a copy of the CIR / cir-secrets-deploy. Simply have a manifest file that lays out which secrets we desire to be pulled from CyberArk for a given environment, and a Jenkinsfile to deploy that manifest.
+code repo - No changes necessary.
+deploy repo - Use the helm style deployment as seen in azs-reporting-db-deploy. If we desire to auto-deploy the secrets each time the code gets deployed, we can add a stage like the following in the Jenkinsfile.
+  stage('Deploy Secrets') {
+   when { branch pattern: "^(stage|release)-.*", comparator: "REGEXP" }
+   steps {
+    script {
+     cirSecrets = 'SER/CIR/Stage_Promote_Release_cir/cir-secrets-deploy/' + env.GIT_BRANCH
+     build job: cirSecrets, wait: true, parameters: [[$class: 'StringParameterValue', name: 'CR', value: env.CR]]
+    }
+   }
+  }
+
+
+Option #2
+If we wish to use Conjur and API calls to CyberArk to retrieve the secrets dynamically at run time, we can follow the pattern laid out in Option #1, but only pull the API_KEY from CyberArk. We then would make programmatic calls to Conjur to retrieve these secrets. This would require updates to the codebase, as well as a deeper dive into understanding how Conjur works. It also exposes the entirety of a safe to the application, which broadens the risk if the API key gets exposed.
+
+Decision
+At this time, the decision has been made to push of any further work towards integrating CyberArk to inject Secrets into OpenShift.
+
+Any secrets that we add to our CyberArk safes should henceforth be added to the environment's DYNAMIC safe (not STATIC). This will future proof us in the case that we wish to pull secrets at runtime.
+
+A discussion with Eric Schofield , Raymond Chandler  and Sam Griffith occurred following a demonstration by Todd Komlenic on their deployment method. It was decided that we do not currently have a pressing need to rotate secrets often. AWS Key rotation dictates a rotation every 90 days. However, we do not currently have access to use AWS keys, so this is a future problem. It was pointed out that changes to secrets can be implemented via the OCP console by our team for all environments other than Production. Even if we followed the deployment method laid out above, we would need to perform a CR to update the keys. The effort would be nearly identical as just updating the keys manually in Production. Additionally, most keys/certs/secrets need rotated only once per year, so the effort is minimal.
+
+The CyberArk OCP Secrets Pipeline uses a method to template out the manifest components into Secrets that is otherwise being dropped. We wish to "wait it out" to see if there is a better integration that will be able to use the Helm deployment directly by the time we find ourselves desiring to work towards automating this secret injection.
+
+
+
+
+
+Part 2
+CSPPR-6243 - (  )
+
+SPIKE Objectives:
+Update AZ-POLICY-CSV to be auto-deploying credentials in RND OpenShift from the RND instance of CyberArk AAM
+Onboarding Guide: https://confluence.pncint.net/spaces/AGO/pages/443591969/CyberArk+OCP+Secrets+Pipeline
+High Level Steps:
+CyberArk Request
+Onboarding new secrets self service portal
+creating new yaml in deploy repo
+testing execution
+If successful, then create draft tickets for implementing same approach for reporting DB for us to pull into scope for Q4
+Timeboxtimer clock: 5 days - Make this match the ticket to keep yourself and your expectations for outcomes in check.
+
+Desired Outcome: ( Make a Decision | Proof of Concept | etc... ) - Proof of Concept
+
+Learnings
+In re-investigating this work, it was discovered that the manifest.yml file still is how they wish for secrets to be injected at build time. There is not currently a better integration to use the helm deployment directly.
+
+Options
+Approach	Pros	Cons	Notes
+Build-Time OpenShift Secret Injection	
+Well Documented
+Other teams have implemented it well
+Secrets we need are defined in deploy repo
+Relatively straightforward
+Only the secrets we need are pulled in, and that is managed outside of OpenShift and our code
+Do not update at runtime
+Will still require CRs to deploy again to retrieve any updated secrets
+
+Run-Time OpenShift Secret Ingestion	
+No CR needed to update secrets for cronjobs (Except API_KEY for Conjur)!
+Auto-Rotated Keys would only need updated in CyberArk
+Opens the applications to be able to see and use ALL secrets in Conjur (broader attack surface)
+Requires refactor to code to call on conjur to load Environment Variables
+Would be difficult to use with any future long-running application
+
+Contents
+
+
+Overview
+Step 1: Submit a CyberArk request to grant the Enterprise Pipeline access to your safes
+Step 2: Onboard a secret Into CyberArk
+Use the Secrets Self Service Portal to get a secret onboarded into CyberArk
+CyberArk AAM URLs
+Step 3: Update yaml manifest to match CyberArk secret entry
+Additional steps for Helm deploy repo
+About CyberArk safe names
+Which CyberArk Safes can I retrieve secrets from?
+Can I skip retrieving secrets from CyberArk for certain environments?
+Step 4: Run it + watch it happen in OpenShift
+Overview
+CyberArk is a vendor product managed by PNC's Cyber Security Team. It is the Enterprise secrets management solution.
+
+The CyberArk/OpenShift secrets pipeline is used to retrieve secrets (such as passwords) from your team's CyberArk safes, and load them into your team's OpenShift project as Secret objects.
+
+Run-time vs Deploy-time
+
+This pipeline is for deploy-time secret loading, not run-time secret loading.
+
+In other words, this pipeline does not make your application capable of pulling secrets from CyberArk. Rather it provides a mechanism to self service the deployment of your secrets into your OpenShift project.
+
+Step 1: Submit a CyberArk request to grant the Enterprise Pipeline access to your safes
+Go to the CyberArk Onboarding request in the ServiceNow catalog:
+
+Request Catalog > Access and Security > Directory Services > Infrastructure Access > CyberArk Onboarding
+
+Enter the following values:
+
+Field	Value
+What type of service are you requesting?	Modify Existing CyberArk Account
+Specify Mnemonic	<Enter your mnemonic>
+Service Type	Other
+Modify Other Account in CyberArk	
+Add the following rows to the request form:
+
+Account ID	Account Category	Host Name	Description of Modification
+DDP-CERT-RND	Other	N/A	Please add the AppId specified above to the <Enter your mnemonic> RND STATIC and DYNAMIC safes.
+DDP-CERT-UAT	Other	N/A	Please add the AppId specified above to the <Enter your mnemonic> UAT STATIC and DYNAMIC safes.
+DDP-CERT-QA	Other	N/A	Please add the AppId specified above to the <Enter your mnemonic> QA STATIC and DYNAMIC safes.
+DDP-CERT-PROD	Other	N/A	Please add the AppId specified above to the <Enter your mnemonic> PROD STATIC and DYNAMIC safes.
+Do not replace "DDP" in these Account IDs with your own mnemonic.
+
+"DDP" is a static part of the Account IDs. The Account IDs should be entered into your request exactly as shown on this page.
+
+Step 2: Onboard a secret Into CyberArk
+If your application requires production level support for lower environment integrations (ie. QA deploys have same level of urgency as production) you must onboard your lower environment secrets into AAM Production safes.
+
+See example success and failure scenarios table below for additional details.
+
+Use the Secrets Self Service Portal to get a secret onboarded into CyberArk 
+
+
+CyberArk AAM URLs
+Environment	URL
+Prod	https://aam.pncint.net/PasswordVault/
+QA	https://aam-qa.pncint.net/PasswordVault/
+UAT	https://aam1-uat.pncint.net/PasswordVault/
+RND	https://aam1-rnd.pncint.net/PasswordVault/
+When you add a secret to CyberArk, note down the values for the address and username fields, as you will need to reference those values in your CD deployment manifest.yml file (see below).
+
+
+
+
+
+
+
+Multi-line secrets
+
+CyberArk is not natively capable of storing multi-line secrets, such as certificates.
+
+To store a multi-line secret in CyberArk, base64-encode the secret, and store the encoded string in CyberArk.
+
+To use a multi-line secret in this pipeline, specify cyberark_base64_encoded: true in your manifest.yml, as shown in the example below.
+
+
+
+Step 3: Update yaml manifest to match CyberArk secret entry
+The CyberArk OCP Secrets pipeline uses the same GitOps deploy repo and a manifest.yml file as used by some deployment types in the Enterprise CD Pipeline. 
+
+You should not need to modify your Jenkinsfile_Stage_Promote_Release file to utilize this feature. Instead, you would either need to add an additional component of type openshift-secret to your components list in the manifest.yml or to include a secrets manifest yaml file in your deploy repo if you are using a helm deploy repo (*Please see the additional steps below for a helm repo).
+
+Here is an example of the openshift-secret component type to be able to use cyberark as a source for your secrets:
+
+manifest.yml
+manifest:
+  ...
+  components:
+  - name: pnc.ddp.samples.openshift-secret
+    type: openshift-secret
+    vars:
+      source: cyberark                           # Set 'component.vars.source' to 'cyberark'
+      openshift_secret_name: pnc.ddp.samples     # This becomes the name of your OCP Secret resource 
+    environments:
+      rnd:
+        vars:
+          oc_project: ddp-rnd
+          openshift_secret_entries:              # This is a list of the entries in your Secret resource
+            - entry_key: ddp_password            # This value is used as the entry key in your Secret resource
+              entry_value:
+                # cyberark_base64_encoded: true  # Set this if you are adding a base64-encoded multiline secret into CyberArk
+                cyberark_address: rnd.pncint.net # The 'address' portion of the secret you are pulling from CyberArk
+                cyberark_username: demo_username # The 'username' portion of the secret you are pulling from CyberArk
+                cyberark_safe: YOUR-SAFE-NAME    # Optional. The CyberArk safe name you want to retrieve the secret from
+
+Additional steps for Helm deploy repo
+If you are either migrating a current manifest deployment (ex. Openshift Templates) to a helm deploy repo or creating a new helm deploy repo, you will need to add a secrets manifest to the repo in order to utilize this feature. You will also need to point the helm release to the location of the secrets manifest using the helm.yaml (example below).
+
+Example of Helm Deploy Repo with Single Secrets Manifest
+
+repo
+└── charts/<deploy repo name>
+   └── configs
+      └── application.properties
+   └── templates
+   └── secrets-manifest.yaml
+   └── Chart.yaml
+Example of Helm Deploy Repo with Multiple Secrets Manifests
+
+repo
+└── charts/<deploy repo name>
+   └── configs
+      └── application.properties
+   └── templates
+   └── secrets
+      └── secrets-manifest-1.yaml
+      └── secrets-manifest-2.yaml
+      └── secrets-manifest-3.yaml
+   └── Chart.yaml
+Here is an example of the helm.yaml which you will need to point the release of the branch you are deploying from to the location of the secrets manifest in your repo:
+
+helm.yaml
+.versionsFile: &versionsFile versions.yaml
+.chartPath: &chartPath ./charts/<deploy repo name>
+.secretsFile: &secretsFile secrets-manifest.yaml ### This is an anchor to set the path to your secrets manifest which can be aliased in the rest of the helm.yaml ###
+branches:
+- name: stage-rnd
+  release:
+    name: <deploy repo name>-rnd
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/stage-rnd.yaml
+    setValues:
+      namespace: <mnemonic>-rnd
+      level: rnd
+      ocp: v4
+- name: stage-uat
+  release:
+    name: <deploy repo name>-uat
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/stage-uat.yaml
+    setValues:
+      namespace: <mnemonic>-uat
+      level: uat
+      ocp: v4
+- name: stage-qa
+  release:
+    name: <deploy repo name>-qa
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/stage-qa.yaml
+    setValues:
+      namespace: <mnemonic>-qa
+      level: qa
+      ocp: v4
+- name: release-qa
+  release:
+    name: <deploy repo name>-qa
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/release-qa.yaml
+    setValues:
+      namespace: <mnemonic>-qa
+      level: qa
+      ocp: v4
+- name: release-prod-gf1
+  release:
+    name: <deploy repo name>-prod-gf1
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/release-prod-gf1.yaml
+    setValues:
+      namespace: <mnemonic>-prod
+      ocp: v4
+- name: release-prod-gf2
+  release:
+    name: <deploy repo name>-prod-gf2
+    chartPath: *chartPath
+    secretsFile: *secretsFile ### You will need to reference the secret manifest path in the release for each branch like this example ###
+    valuesFiles:
+      - *versionsFile
+      - environments/release-prod-gf2.yaml
+    setValues:
+      namespace: <mnemonic>-prod
+      ocp: v4
+About CyberArk safe names
+CyberArk safes use the following naming convention at PNC:
+
+MNEMONIC-TYPE-ENVIRONMENT
+
+The safe name is made of three parts:
+
+Part	Allowed Values	Description
+MNEMONIC	Three uppercase letters	Any valid PNC mnemonic.
+TYPE	
+DYNAMIC 
+
+STATIC 
+
+The CyberArk team boards secrets into either your DYNAMIC safes or your STATIC safes, based on certain criteria.
+
+ENVIRONMENT	
+RND 
+
+UAT 
+
+QA 
+
+PROD 
+
+This matches the CyberArk environment where your secret is onboarded.
+Which CyberArk Safes can I retrieve secrets from?
+This is now configurable via the new, optional, cyberark_safe key.
+
+Initially, the pipeline only supported the DYNAMIC safe type and the PROD environment. For example, mnemonic ABC is only able to retrieve secrets from the ABC-DYNAMIC-PROD safe.
+
+Today, the pipeline allows users to specify which safe they want to retrieve secrets from by setting a value for the new cyberark_safe key. If you do not specify a cyberark_safe, the pipeline will continue defaulting to your -DYNAMIC-PROD safe.
+
+There are some rules around what values are allowed for cyberark_safe:
+
+Crossing mnemonics is restricted. The mnemonic of your CyberArk safe must match the mnemonic of your DDP Jenkins folder, or the pipeline will fail.
+There are no exceptions to this rule; there is no list or system of record showing which mnemonics are allowed to retrieve secrets from other mnemonics' safes.
+Crossing environments is partially restricted:
+Deployments to RND may retrieve secrets from RND or PROD
+Deployments to UAT may retrieve secrets from UAT or PROD
+Deployments to QA may retrieve secrets from QA or PROD
+Deployments to PROD may only retrieve secrets from PROD
+Example success and failure scenarios:
+
+Mnemonic Deploying	Target Environment	cyberark_safe value	Result	Reason
+ABC	RND	ABC-STATIC-PROD	
+SUCCESS
+
+
+ABC	RND	ABC-DYNAMIC-RND	
+SUCCESS
+
+
+ABC	RND	ABC-STATIC-UAT	
+FAILURE
+
+UAT is not an allowed CyberArk safe environment for deployments to RND
+ABC	QA	ABC-DYNAMIC-QA	
+SUCCESS
+
+
+ABC	QA	XYZ-STATIC-QA	
+FAILURE
+
+Mnemonic ABC may not retrieve secrets from mnemonic XYZ's CyberArk safe
+ABC	Prod	ABC-DYNAMIC-QA	
+FAILURE
+
+QA is not an allowed CyberArk safe environment for deployments to Prod
+Can I skip retrieving secrets from CyberArk for certain environments?
+Yes - if you omit the openshift_secret_entries section for the desired environment in your manifest file, the pipeline will skip processing secrets for that environment.
+
+For example, the following manifest will process secrets for QA and Prod, but it will skip processing secrets for RND and UAT:
+
+manifest.yml
+manifest:
+  ...
+  components:
+  - name: pnc.ddp.samples.openshift-secret
+    type: openshift-secret
+    vars:
+      source: cyberark
+      openshift_secret_name: pnc.ddp.samples
+    environments:
+      rnd:
+        vars:
+          oc_project: ddp-rnd
+      uat:
+        vars:
+          oc_project: ddp-uat
+      qa:
+        vars:
+          oc_project: ddp-qa
+          openshift_secret_entries:
+            - entry_key: ddp_password
+              entry_value:
+                cyberark_address: qa.pncint.net
+                cyberark_username: demo_username
+      prod:
+        vars:
+          oc_project: ddp-prod
+          openshift_secret_entries:
+            - entry_key: ddp_password
+              entry_value:
+                cyberark_address: prod.pncint.net
+                cyberark_username: demo_username 
+
+Openshift Secrets
+When working with secrets in OCP projects you will be working inside of a BitBucket project and Cyberark AAM.
+Certificated are Base64 encoded and stored as a password in Cyberark AAM
+The Bitbucket repo acts as a map to translate and associate passwords/keystores/etc stored in AAM to secrets in OCP and their associated keys.
+
+Manifest.yml structure
+In the code block below items surrounded in <> should be replaced with their counter part. Indendations can be 2 spaces or tab but must be the same throughout
+
+
+
+manifest:
+	group: pnc.<mne>.ocp4.deployments
+	artifactId: <deploy repo name>-cyberark-manifest
+	version: <version number iterated when changes made>
+	environments:
+		<env>:
+			level: <env>
+	components:
+		- name: <secret name>.openshift-secret
+			type: openshift-secret
+			vars:
+				source: cyberark
+				openshift_secret_name: <secret name>
+			environments:
+				<env>:
+					vars:
+						oc_project: <ocp namespace>
+						openshift_secret_entries:
+							- entry_key: <secret key name>					# This is the name of the Secret in Openshift that is referenced 
+																			# by the helm charts. It can store one or multiple entry keys.
+								entry_value:
+									cyberark_base64_encoded: true			# Only include this line for keystores/certs when they are base64 encoded in AAM
+									cyberark_safe: <CA AAM Safe Name>		# this is usually <MNE>-STATIC-<ENV>
+									cyberark_username: <CA AAM Entry Name>
+									cyberark_address: <Address of CA AAM Entry>	
+
+
+
+
+When you make a change to the manifest.yml file make sure you update the version line as well as update the manifestVersion in the Jenkinsfile_Stage_Promote_Release file to the same version.  
+
+Keystores/Truststores/Certificates
+Because Cyberark AAM cannot store binary objects any file must be stored as a base64 string in the Cyberark AAM Entry password. When you are working with a keystore/truststore/certificate that needs to be in an OCP secret you will need to convert it by using one of the following methods.
+
+Convert Binary to Base64
+POWERSHELL
+$in = ‘inputfile.type'; $out = 'outputfile.b64'
+[Convert]::ToBase64String([IO.File]::ReadAllBytes($in)) | Set-Content -Path $out -Encoding ASCII -NoNewline
+
+BASH
+base64 -w0 inputfile.type > outputfile.b64
+
+
+Convert Base64 to Binary
+POWERSHELL
+[IO.File]::WriteAllBytes('outputfile.type',[Convert]::FromBase64String((Get-Content -Raw 'inputfile.b64')))
+
+
+BASH
+base64 -d inputfile.b64 > outputfile.type
+
+
+Keystore/Truststore maintenance
+In cases where you need to change any certificates/keys in a store use the Keystore Explorer (in Software Center) to modify stores accordingly.
+
+Secrets Update Procedure
+No Bitbucket change just password change in Cyberark AAM
+When you need up update an object in Cyberark AAM by changing the password (or base64 encoded string as a password) but no change is being made to the manifest.yml (usually in the case where there is no change to the entries or how they are mapped all that needs to be done is update the Cyberark AAM entry(ies) and then log into the Jenkins instance for your mnemonic choose the deployment (for SFG it is sfg, for PNM its pnm and for ICC its icc) and then find the secrets deploy repo for your mnemonic. Once there make sure to choose the branch for the environment you are working on and on the left side there should be a build now button. Click that and within 30 seconds you should see a new build start. Once the build is complete go into OCP and find the secret you were working on and confirm that it has been updated to match the data in Cyberark AAM. In the case of the Keystore/Truststores/Certificates that are stored as a binary file you will download it and check it with keystore explorer. If it is one of the minority cases where it is stored as a base64 string (when you click `reveal values` it will show a wall of text) you will need to copy that to a file and use the Convert Base64 to Binary method above to be able to open in keystore explorer and confirm.
+
+Bitbucket changes.
+In the case that you have to remove or add secrets or entries in secrets (refer to the manifest.yml section above) you will need to use vs code and git to pull the repo, make your changes, and push them to back up to the repo. When you push those changes it will cause the pipeline to kick off at which point you can go to the Jenkins pipeline for your mnemonic and watch the execution. Then as in the no bitbucket process you would validate the secrets in OCP and confirm the changes were pushed.

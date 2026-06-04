@@ -24,7 +24,7 @@ internal sealed class ConfluenceHealthCheck(IHttpClientFactory factory, ILogger<
     {
         try
         {
-            HttpResponseMessage status = await factory.CreateClient(ConfluenceModule.BackfillClient)
+            HttpResponseMessage status = await factory.CreateClient(ConfluenceHttpClients.BackfillClient)
                 .GetAsync("status", cancellationToken)
                 .ConfigureAwait(false);
 

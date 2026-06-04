@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using Dse.Sources;
 using Elastic.Channels;
 using Elastic.Ingest.Elasticsearch;
 
@@ -23,6 +24,17 @@ public interface IIngestContext<in TDoc> where TDoc : class
     public long TotalToProduce { get; }
     ValueTask<bool> WaitToWriteDocAsync(CancellationToken ct);
     ValueTask WriteDocAsync(TDoc doc, CancellationToken ct);
+}
+
+/// <summary>End-to-end ingestion pipeline for one source.</summary>
+public interface IIngestRunner
+{
+    SourceKey SourceKey { get; }
+
+    /// <summary>Live progress of the in-flight run, computed on demand for the status endpoint.</summary>
+    IngestProgress CurrentSnapshot { get; }
+
+    Task RunAsync(IngestRun run, CancellationToken ct);
 }
 
 internal sealed class IngestContext<TDoc>(IngestChannel<TDoc> channel, long totalToProduce) : IIngestContext<TDoc>

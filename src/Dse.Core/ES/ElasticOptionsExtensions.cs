@@ -15,12 +15,12 @@ public static class ElasticOptionsExtensions
     {
         services
             .AddFluentOptions<ElasticOptions>(ElasticOptions.SectionName)
-            .PostConfigure<DseEnv>(static (o, env) =>
+            .PostConfigure<IDseEnvironment>(static (o, env) =>
             {
-                if (env is { LocalCredentials: { } lc })
+                if (env is IDseLocalEnvironment localEnv)
                 {
-                    o.Username = o.Username.Or(lc.Username);
-                    o.Password = o.Password.Or(lc.Password);
+                    o.Username = o.Username.Or(localEnv.Username);
+                    o.Password = o.Password.Or(localEnv.Password);
                 }
             })
             .WithFluentValidator<ElasticOptions, ElasticOptionsValidator>();
@@ -31,7 +31,7 @@ public static class ElasticOptionsExtensions
 
         services.AddSingleton<ElasticsearchClient>(static sp =>
         {
-            var env = sp.GetRequiredService<DseEnv>();
+            var env = sp.GetRequiredService<IDseEnvironment>();
             var opts = sp.GetRequiredService<ElasticOptions>();
             var es = new ElasticsearchClientSettings(new Uri(opts.BaseAddress));
 
@@ -56,12 +56,13 @@ public static class ElasticOptionsExtensions
                 .RequestTimeout(TimeSpan.FromSeconds(60))
                 .MaxRetryTimeout(TimeSpan.FromSeconds(180));
 
-            return new ElasticsearchClient(env is DseEnv.Dev ? es.EnableDebugMode() : es);
+            return new ElasticsearchClient(env is IDseLocalEnvironment ? es.EnableDebugMode() : es);
         });
 
         services.AddSingleton<ITransport>(static sp => sp.GetRequiredService<ElasticsearchClient>().Transport);
 
-        services.AddHealthChecks()
+        services
+            .AddHealthChecks()
             .AddCheck<ElasticHealthCheck>("elastic", HealthStatus.Unhealthy, ["ready"], TimeSpan.FromSeconds(8));
     }
 }

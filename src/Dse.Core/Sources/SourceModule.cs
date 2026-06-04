@@ -3,50 +3,62 @@
 
 using System.Reflection;
 using Elastic.Mapping;
-using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Dse.Sources;
 
-[AttributeUsage(AttributeTargets.Assembly)]
-public abstract class SourceModuleAttribute(Type moduleType) : Attribute
+public abstract class SourceModule
 {
-    public SourceModule Module { get; } =
-        Activator.CreateInstance(moduleType) as SourceModule ?? throw new ArgumentException(
-            $"Type {moduleType} does not implement {nameof(SourceModule)}.");
+    private protected SourceModule(string key) => SourceKey = SourceKey.Create(key);
+
+    public Assembly Assembly => GetType().Assembly;
+    public SourceKey SourceKey { get; }
+    public abstract ElasticsearchTypeContext GetTypeContext(IDseEnvironment env);
+    public abstract void Register(IServiceCollection services);
+    public abstract void Configure(IEndpointRouteBuilder app);
 }
 
-[AttributeUsage(AttributeTargets.Assembly)]
-public sealed class SourceModuleAttribute<TModule>()
-    : SourceModuleAttribute(typeof(TModule)) where TModule : SourceModule, new();
-
-public abstract class SourceModule(string key)
+public abstract class SourceModule<TDoc>(string key) : SourceModule(key) where TDoc : class
 {
-    public Assembly Assembly => GetType().Assembly;
-    public SourceKey SourceKey { get; } = SourceKey.Create(key);
-    public abstract ElasticsearchTypeContext GetTypeContext(DseEnv env);
-    public abstract void Build(SourceBuilder builder);
-    public virtual void ExtendSearchEndpoint(RouteHandlerBuilder builder) { }
+    public abstract void Register(SourceBuilder<TDoc> builder);
+    public sealed override void Register(IServiceCollection services) => Register(new SourceBuilder<TDoc>(this, services));
+
+    public abstract void Configure(SourcePipelineBuilder builder);
+
+    public sealed override void Configure(IEndpointRouteBuilder app) => Configure(new SourcePipelineBuilder(app, SourceKey));
 }
 
 public static class SourceModuleExtensions
 {
-    public static SourceModule GetAssemblySourceModule(this Type type) =>
-        type.Assembly.GetCustomAttribute<SourceModuleAttribute>()?.Module
-        ?? throw new InvalidOperationException($"Assembly {type.Assembly} does not have a {nameof(SourceModuleAttribute)}.");
+    public static SourceModule? GetSourceModule(this Type type) =>
+        type.Assembly.GetCustomAttribute<SourceManifestAttribute>()?.Module;
 
-    public static SourceKey GetAssemblySourceKey(this Type type) => type.GetAssemblySourceModule().SourceKey;
+    public static SourceModule? GetSourceModule(this object obj) =>
+        obj.GetType().GetSourceModule();
 
-    public static void AddSourceModule<TModule>(this IServiceCollection services) where TModule : SourceModule
-    {
-        if (typeof(TModule).Assembly.GetCustomAttribute<SourceModuleAttribute>() is { Module: { } module })
-        {
-            module.Build(new SourceBuilder(module, services));
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                $"Assembly {typeof(TModule).Assembly} does not have a {nameof(SourceModuleAttribute)}.");
-        }
-    }
+    public static SourceModule GetRequiredSourceModule(this Type type) =>
+        type.GetSourceModule()
+        ?? throw new InvalidOperationException($"Assembly {type.Assembly} does not have a {nameof(SourceManifestAttribute)}.");
+
+    public static SourceModule GetRequiredSourceModule(this object obj) =>
+        obj.GetType().GetRequiredSourceModule();
+
+    public static SourceKey? GetSourceKey(this Type type) => type.GetSourceModule()?.SourceKey;
+    public static SourceKey? GetSourceKey(this object obj) => obj.GetType().GetSourceKey();
+
+    public static SourceKey GetRequiredSourceKey(this Type type) => type.GetRequiredSourceModule().SourceKey;
+    public static SourceKey GetRequiredSourceKey(this object obj) => obj.GetType().GetRequiredSourceKey();
+
+    public static ElasticsearchTypeContext? GetTypeContext(this Type type, IDseEnvironment env) =>
+        type.GetSourceModule()?.GetTypeContext(env);
+
+    public static ElasticsearchTypeContext? GetTypeContext(this object obj, IDseEnvironment env) =>
+        obj.GetType().GetTypeContext(env);
+
+    public static ElasticsearchTypeContext GetRequiredTypeContext(this Type type, IDseEnvironment env) =>
+        type.GetRequiredSourceModule().GetTypeContext(env);
+
+    public static ElasticsearchTypeContext GetRequiredTypeContext(this object obj, IDseEnvironment env) =>
+        obj.GetType().GetRequiredTypeContext(env);
 }

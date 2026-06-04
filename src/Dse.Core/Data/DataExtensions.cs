@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Thinktecture;
 using Weasel.Core;
 using Weasel.Sqlite;
 using Wolverine.EntityFrameworkCore;
@@ -21,7 +22,7 @@ public static class DataExtensions
     public static string GetSqliteConnectionString(this IServiceProvider services) =>
         services.GetRequiredService<IConfiguration>().GetSqliteConnectionString();
 
-    public static void AddData(this IHostApplicationBuilder builder)
+    public static void AddDataContext(this IHostApplicationBuilder builder)
     {
         GridifyGlobalConfiguration.EnableEntityFrameworkCompatibilityLayer();
 
@@ -35,8 +36,7 @@ public static class DataExtensions
 
             dbCtxOpts.UseSqlite(sp.GetSqliteConnectionString());
             dbCtxOpts.UseProjectables();
+            dbCtxOpts.UseThinktectureValueConverters();
         });
-
-        builder.Services.AddSingleton<Migrator>(new SqliteMigrator());
     }
 }

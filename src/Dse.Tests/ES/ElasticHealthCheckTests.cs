@@ -14,7 +14,7 @@ public sealed class ElasticHealthCheckTests(ITestOutputHelper toh, TestFixture f
     [Fact]
     public Task ReadyEndpoint_WithLiveCluster_ReportsHealthy() => Scenario(s =>
     {
-        s.Get.Url("/api/health/elastic");
+        s.Get.Url("/health/elastic");
         s.StatusCodeShouldBeOk();
     });
 }

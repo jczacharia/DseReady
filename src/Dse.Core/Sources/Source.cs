@@ -44,17 +44,17 @@ public sealed partial class SourceKey
     }
 }
 
-public sealed class Source : IEntity<SourceKey>
+public sealed class Source : Entity<SourceKey>
 {
-    public required string AssemblyQualifiedName { get; init; }
-    public required SourceKey Id { get; init; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? UpdatedAt { get; set; }
-    public SourceModule GetModule() => Type.GetType(AssemblyQualifiedName)!.GetAssemblySourceModule();
+    public override required SourceKey Id { get; init; }
+    public string AssemblyQualifiedName { get; private init; } = null!;
+    public SourceModule GetModule() => Type.GetType(AssemblyQualifiedName)!.GetRequiredSourceModule();
+
+    private Source() { }
 
     public static Source FromType(Type type)
     {
-        SourceModule module = type.GetAssemblySourceModule();
+        SourceModule module = type.GetRequiredSourceModule();
         return new Source
         {
             Id = module.SourceKey,

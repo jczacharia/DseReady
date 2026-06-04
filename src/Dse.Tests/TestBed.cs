@@ -23,7 +23,7 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
     protected WolverineRuntime Runtime => (WolverineRuntime)Host.Services.GetRequiredService<IWolverineRuntime>();
 
     protected static int TimeoutMs => Debugger.IsAttached ? 1_000_000 : 5000;
-    protected CancellationToken Ct => TestContext.Current.CancellationToken;
+    protected static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     public ValueTask InitializeAsync()
     {
@@ -39,6 +39,10 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
     }
 
     protected AlbaHostExtensions.ResponseExpression ResponseExpression(Action<Scenario> configure) => new(Host, configure);
+
+    // Plain HTTP call with no Wolverine activity tracking — for async endpoints (e.g. 202-then-background) where
+    // we must NOT wait for the published message to finish before the response returns.
+    protected Task<IScenarioResult> Http(Action<Scenario> configure) => Host.Scenario(configure);
 
     protected async Task<IScenarioResult> Scenario(Action<Scenario> configure)
     {

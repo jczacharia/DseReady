@@ -8,10 +8,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Dse.Data;
 
+public interface IDomainEvent;
+
 public interface IEntity
 {
     DateTimeOffset CreatedAt { get; set; }
     DateTimeOffset? UpdatedAt { get; set; }
+    IReadOnlyList<IDomainEvent> Events { get; }
+    public void Publish(IDomainEvent @event);
 }
 
 public interface IEntity<TKey> : IEntity where TKey : notnull
@@ -21,31 +25,37 @@ public interface IEntity<TKey> : IEntity where TKey : notnull
 
 public abstract class Entity<TKey> : IEntity<TKey> where TKey : notnull
 {
-    public required TKey Id { get; init; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public abstract TKey Id { get; init; }
+    public virtual DateTimeOffset CreatedAt { get; set; }
+    public virtual DateTimeOffset? UpdatedAt { get; set; }
+
+    private readonly List<object> _events = [];
+    IReadOnlyList<IDomainEvent> IEntity.Events => _events.OfType<IDomainEvent>().ToList();
+
+    public void Publish(IDomainEvent e)
+    {
+        _events.Add(e);
+    }
 }
 
-public abstract class Entity : IEntity<Guid>
+public abstract class Entity : Entity<Guid>
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public sealed override Guid Id { get; init; } = Guid.NewGuid();
 }
 
 public sealed record EntityResponse<TKey>(TKey Id, Uri Location) where TKey : notnull;
 
 public static class EntityExtensions
 {
-    public static AcceptedAtRoute<EntityResponse<TKey>> EntityAccepted<TKey, TEntity>(
+    public static AcceptedAtRoute<EntityResponse<TKey>> EntityAccepted<TKey>(
         this HttpContext httpContext,
-        TEntity entity,
+        TKey id,
         string routeName,
-        object? routeValues) where TEntity : IEntity<TKey> where TKey : notnull
+        object? routeValues) where TKey : notnull
     {
         var linkGenerator = httpContext.RequestServices.GetRequiredService<LinkGenerator>();
         string? location = linkGenerator.GetUriByName(httpContext, routeName, routeValues);
         var uri = new Uri(location ?? throw new NotSupportedException($"Could not create URI for endpoint '{routeName}'"));
-        return TypedResults.AcceptedAtRoute(new EntityResponse<TKey>(entity.Id, uri), routeName, routeValues);
+        return TypedResults.AcceptedAtRoute(new EntityResponse<TKey>(id, uri), routeName, routeValues);
     }
 }
