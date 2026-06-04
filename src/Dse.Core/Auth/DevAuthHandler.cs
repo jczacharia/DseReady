@@ -19,13 +19,20 @@ public sealed class DevAuthHandler(
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (dseEnv is not IDseLocalEnvironment { Username: { } username })
+        if (dseEnv is not IDseLocalEnvironment localEnv)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        ClaimsIdentity identity = new();
-        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, username));
+        // Pass the scheme name as the authentication type so the identity reports IsAuthenticated — otherwise
+        // RequireAuthenticatedUser policies reject it and the claims-enrichment middleware skips it.
+        ClaimsIdentity identity = new(Scheme.Name);
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localEnv.Username));
+        foreach (string role in localEnv.Roles)
+        {
+            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+        }
+
         ClaimsPrincipal principal = new(identity);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }

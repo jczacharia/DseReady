@@ -17,8 +17,8 @@ namespace Dse.Data.Migrations
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
                     AssemblyQualifiedName = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -33,8 +33,8 @@ namespace Dse.Data.Migrations
                     SourceKey = table.Column<string>(type: "TEXT", nullable: false),
                     DryRun = table.Column<bool>(type: "INTEGER", nullable: false),
                     ActiveSourceKey = table.Column<string>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -63,8 +63,8 @@ namespace Dse.Data.Migrations
                     Produced = table.Column<long>(type: "INTEGER", nullable: false),
                     ManagedMemoryBytes = table.Column<long>(type: "INTEGER", nullable: false),
                     WorkingMemoryBytes = table.Column<long>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {

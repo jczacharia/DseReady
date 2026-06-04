@@ -2,6 +2,7 @@
 
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dse.Data;
 using Dse.Shared;
 using EntityFrameworkCore.Projectables;
@@ -13,6 +14,7 @@ using UnitsNet;
 
 namespace Dse.Ingestion;
 
+[JsonConverter(typeof(JsonStringEnumConverter<IngestCheckpoint>))]
 public enum IngestCheckpoint
 {
     Queued,
@@ -39,7 +41,11 @@ public sealed class IngestProgress : Entity<Guid>, IDisposable
     public IngestCheckpoint Checkpoint { get; init; } = IngestCheckpoint.Queued;
     public JsonDocument Metadata { get; init; } = JsonDocument.Parse("{}");
 
+    // Back-reference for the EF relationship only; never serialized — the run owns the phases, so serializing
+    // the phase's parent would cycle (Run → Phases → Run → …). RunId carries the association in responses.
+    [JsonIgnore]
     public IngestRun Run { get; init; } = null!;
+
     public Guid RunId { get; init; }
 
     /// <summary>A checkpoint carrying no live counters — for control-plane transitions (cancel, interrupt, ...).</summary>

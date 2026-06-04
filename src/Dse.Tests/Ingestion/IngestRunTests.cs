@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using Dse.Auth;
 using Dse.Data;
 using Dse.Ingestion;
+using Dse.Ingestion.Endpoints;
 using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,14 +49,49 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     [Fact]
     public async Task Dry_ingest_runs_a_single_document_and_succeeds()
     {
+        SourceKey key = Confluence;
         Stub.Total = 5; // a dry run clamps its own work to one document regardless of corpus size.
-        Guid runId = await StartAndAwaitAsync(Confluence, dryRun: true, s_readonly);
+        Guid runId = await StartAndAwaitAsync(key, dryRun: true, s_readonly);
 
         IngestRun run = await ReadRunAsync(runId);
         run.DryRun.Should().BeTrue();
         run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Succeeded);
         run.Phases.Should().Contain(p => p.Checkpoint == IngestCheckpoint.Started);
         run.ActiveSourceKey.Should().BeNull("a terminal run releases its single-flight slot");
+
+        // The status endpoint must serialize cleanly — the phase→run back-reference must not cycle.
+        IScenarioResult statusResult = await Http(s =>
+        {
+            s.Get.Url($"/sources/{key}/ingest/{runId}");
+            s.WithUser(s_readonly);
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var status = await statusResult.ReadAsJsonAsync<IngestRunStatus>();
+        status.Should().NotBeNull();
+        status!.Id.Should().Be(runId);
+        status.Phases.Should().Contain(p => p.Checkpoint == IngestCheckpoint.Succeeded);
+    }
+
+    [Fact]
+    public async Task Overview_reports_idle_then_history_after_a_run()
+    {
+        SourceKey key = Confluence;
+
+        // Idle to begin with: a source is listed, nothing in flight.
+        IngestionOverview before = await OverviewAsync();
+        SourceIngestionStatus confluenceBefore = before.Sources.Single(s => s.SourceKey == key);
+        confluenceBefore.State.Should().Be(IngestState.Idle);
+        confluenceBefore.Current.Should().BeNull();
+
+        Stub.Total = 5;
+        Guid runId = await StartAndAwaitAsync(key, dryRun: true, s_admin);
+
+        // After a completed run: back to idle, with the run recorded in history.
+        IngestionOverview after = await OverviewAsync();
+        SourceIngestionStatus confluenceAfter = after.Sources.Single(s => s.SourceKey == key);
+        confluenceAfter.State.Should().Be(IngestState.Idle);
+        confluenceAfter.History.Should().Contain(r => r.RunId == runId && r.Checkpoint == IngestCheckpoint.Succeeded);
     }
 
     [Fact]
@@ -147,5 +183,19 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
         DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
         return await db.IngestRuns.AsNoTracking().FirstAsync(r => r.Id == runId, Ct);
+    }
+
+    private async Task<IngestionOverview> OverviewAsync()
+    {
+        IScenarioResult result = await Http(s =>
+        {
+            s.Get.Url("/ingestion");
+            s.WithUser(s_readonly);
+            s.StatusCodeShouldBe(HttpStatusCode.OK);
+        });
+
+        var overview = await result.ReadAsJsonAsync<IngestionOverview>();
+        overview.Should().NotBeNull();
+        return overview!;
     }
 }

@@ -32,8 +32,9 @@ public interface IDseDeploymentEnvironment : IDseEnvironment
 
 public interface IDseLocalEnvironment : IDseEnvironment
 {
-    public string Username { get; }
-    public string Password { get; }
+    public string Username { get; init; }
+    public string Password { get; init; }
+    public string[] Roles { get; init; }
 }
 
 internal static class DseEnvironmentExtensions
@@ -44,7 +45,7 @@ internal static class DseEnvironmentExtensions
     {
         if (IDseEnvironment.IsRelease)
         {
-            services.TryAddSingleton<IDseEnvironment>(sp =>
+            services.AddSingleton<IDseEnvironment, DseDeploymentEnvironment>(sp =>
             {
                 var cfg = sp.GetRequiredService<IConfiguration>();
                 var hostEnv = sp.GetRequiredService<IHostEnvironment>();
@@ -67,7 +68,7 @@ internal static class DseEnvironmentExtensions
         }
         else
         {
-            services.TryAddSingleton<IDseEnvironment>(sp =>
+            services.AddSingleton<IDseEnvironment, DseLocalEnvironment>(sp =>
             {
                 var cfg = sp.GetRequiredService<IConfiguration>();
                 var hostEnv = sp.GetRequiredService<IHostEnvironment>();
@@ -75,15 +76,15 @@ internal static class DseEnvironmentExtensions
                 ArgumentException.ThrowIfNullOrWhiteSpace(cfg["Local:Username"], "Missing Local:Username configuration value.");
                 ArgumentException.ThrowIfNullOrWhiteSpace(cfg["Local:Password"], "Missing Local:Password configuration value.");
 
-                return new DseLocalEnvironment
+                var env = new DseLocalEnvironment
                 {
                     ApplicationName = hostEnv.ApplicationName,
                     ContentRootFileProvider = hostEnv.ContentRootFileProvider,
                     ContentRootPath = hostEnv.ContentRootPath,
                     EnvironmentName = hostEnv.EnvironmentName,
-                    Username = cfg["Local:Username"]!,
-                    Password = cfg["Local:Password"]!,
                 };
+                cfg.Bind("Local", env);
+                return env;
             });
         }
     }
@@ -99,11 +100,12 @@ internal static class DseEnvironmentExtensions
 
     private sealed class DseLocalEnvironment : IDseLocalEnvironment
     {
-        public required string ApplicationName { get; set; }
-        public required IFileProvider ContentRootFileProvider { get; set; }
-        public required string ContentRootPath { get; set; }
-        public required string EnvironmentName { get; set; }
-        public required string Username { get; init; }
-        public required string Password { get; init; }
+        public string ApplicationName { get; set; } = string.Empty;
+        public IFileProvider ContentRootFileProvider { get; set; } = null!;
+        public string ContentRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = string.Empty;
+        public string Username { get; init; } = string.Empty;
+        public string Password { get; init; } = string.Empty;
+        public string[] Roles { get; init; } = [];
     }
 }

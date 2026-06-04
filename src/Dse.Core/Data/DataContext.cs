@@ -6,9 +6,19 @@ using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Thinktecture;
 
 namespace Dse.Data;
+
+/// <summary>
+///     Stores a <see cref="DateTimeOffset" /> as its UTC tick count. SQLite's TEXT representation can't be ordered
+///     or compared server-side (EF throws on ORDER BY), and a monotonic <c>long</c> sorts chronologically. Every
+///     timestamp in this model is UTC, so collapsing the (always-zero) offset loses nothing.
+/// </summary>
+public sealed class UtcTicksConverter() : ValueConverter<DateTimeOffset, long>(
+    offset => offset.UtcTicks,
+    ticks => new DateTimeOffset(ticks, TimeSpan.Zero));
 
 public sealed class DataContext(DbContextOptions<DataContext> options) : DbContext(options)
 {
@@ -42,6 +52,12 @@ public sealed class DataContext(DbContextOptions<DataContext> options) : DbConte
                     break;
             }
         }
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Properties<DateTimeOffset>().HaveConversion<UtcTicksConverter>();
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

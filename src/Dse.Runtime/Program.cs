@@ -2,6 +2,7 @@
 
 
 using Dse.Auth;
+using Dse.Ingestion.Endpoints;
 using Dse.Shared;
 using Dse.Sources;
 using Dse.Sources.Confluence;
@@ -151,7 +152,14 @@ internal sealed class Program
         app.MapDefaultHealthChecks().AllowAnonymous();
 
         app.UseAuthentication();
-        app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
+
+        // In development DevAuth supplies entitlements directly; there is no directory to enrich against, so skip
+        // LDAP enrichment (it would otherwise fail to connect and fault every request).
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
+        }
+
         app.UseAuthorization();
 
         RouteGroupBuilder sources = app.MapGroup("sources").RequireAuthorization();
@@ -160,6 +168,9 @@ internal sealed class Program
         {
             module.Configure(sources);
         }
+
+        // Cross-source ops board — deliberately not confined under /sources/{key}.
+        app.MapIngestionOverviewEndpoint();
 
         return await app.RunJasperFxCommands(args);
     }
