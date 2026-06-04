@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,7 @@ using Novell.Directory.Ldap;
 
 namespace Dse.Auth;
 
+[ExcludeFromCodeCoverage]
 public sealed class LdapConnector(string name, IServiceProvider services) : IDisposable
 {
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();

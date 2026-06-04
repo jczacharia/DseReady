@@ -2,28 +2,25 @@
 
 
 using Dse.Sources;
-using JasperFx;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Weasel.Core;
-using Weasel.EntityFrameworkCore;
 
 namespace Dse.Data;
 
-public sealed class DataMigrator(IEnumerable<SourceModule> modules, IServiceProvider sp)
-    : IInitialData<DataContext>, IHostedService
+/// <summary>
+///     Brings the database schema up to date with EF Core migrations and seeds the source registry on startup.
+///     A single always-on pod with a disposable SQLite database makes applying migrations at startup the right
+///     trade-off here (no farm, no concurrent migrators); EF's own migration lock guards the rest.
+/// </summary>
+public sealed class DataMigrator(IEnumerable<SourceModule> modules, IServiceProvider sp) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await using var scope = sp.CreateAsyncScope();
-        await using var context = scope.ServiceProvider.GetRequiredService<DataContext>();
-        await using var migration = await sp.CreateMigrationAsync(context, cancellationToken);
+        await using AsyncServiceScope scope = sp.CreateAsyncScope();
+        DataContext context = scope.ServiceProvider.GetRequiredService<DataContext>();
 
-        if (migration.Migration.Difference is not SchemaPatchDifference.None)
-        {
-            await migration.ExecuteAsync(AutoCreate.All, cancellationToken);
-        }
-
+        await context.Database.MigrateAsync(cancellationToken);
         await Populate(context, cancellationToken);
     }
 

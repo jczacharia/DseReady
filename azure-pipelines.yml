@@ -1,0 +1,53 @@
+trigger:
+  branches:
+    include:
+      - "main"
+
+# #################################################
+# PNC Azure DevOps Enterprise Automation Pipeline
+# #################################################
+variables:
+  - template: environments/shared-values.yml@templates
+
+  # Update the following lines to get the automation pipeline working:
+  - name: version
+    value: "2.0.0"
+  - name: mnemonic
+    value: dse
+  # This has to be lower case as well due to artifactory
+  - name: app_name
+    value: searchapi
+  - name: manifest_repo
+    value: "git.pncint.net/dse/dse-deploy.git"
+  - name: build_type
+    value: dotnet
+  - name: dotnet_version
+    value: "8.0"
+  - name: helm_deploy
+    value: true
+  - name: sonar_custom_exclusions
+    value: "*Tests*.cs,*testresult*.xml,*opencover*.xml,**/Program.cs,*Dockerfile*,**/quality_engineering/**"
+  - name: qfaasDirectory
+    value: "quality_engineering/DseDataPipelines-services"
+  - name: publish_proj
+    value: "src/Dse.Runtime/Dse.Runtime.csproj"
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      endpoint: enterprise_pnc_automation
+      name: PNC - ADO Enterprise Automation Pipeline/pnc-enterprise-templates
+      # Use 'ref' to reference a template on a branch other than master
+      ref: refs/heads/master
+
+# Azure automation pipeline templates
+jobs:
+  - ${{ if eq(variables.build_type, 'dotnet') }}:
+      - template: enterprise-pipeline/pipeline_dotnet.yml@templates
+  - ${{ if eq(variables.build_type, 'npm') }}:
+      - template: enterprise-pipeline/pipeline_npm.yml@templates
+  - ${{ if eq(variables.build_type, 'multi_component_dotnet') }}:
+      - template: enterprise-pipeline/pipeline_multi_component_dotnet.yml@templates
+  - ${{ if eq(variables.build_type, 'multi_component_npm') }}:
+      - template: enterprise-pipeline/pipeline_npm.yml@templates

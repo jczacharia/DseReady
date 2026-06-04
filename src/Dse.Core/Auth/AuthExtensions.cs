@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Claims;
 using Dse.Shared;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Dse.Auth;
 
+[ExcludeFromCodeCoverage]
 public static class AuthExtensions
 {
     public static bool IsAnonymous(this ClaimsPrincipal user) =>

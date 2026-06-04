@@ -8,6 +8,7 @@ using Dse.Ingestion;
 using Dse.Messaging;
 using Dse.Shared;
 using Dse.Sources;
+using JasperFx.Resources;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
@@ -21,8 +22,6 @@ using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Weasel.Core;
-using Weasel.Sqlite;
 
 namespace Dse;
 
@@ -38,12 +37,12 @@ public static class ServiceDefaultsExtensions
         builder.Services.AddDseEnvironment();
         builder.Services.AddHostedService<SourcesValidator>();
 
+        builder.Services.AddResourceSetupOnStartup();
         builder.AddDataContext();
-        builder.Services.AddSingleton<Migrator, SqliteMigrator>();
-
         builder.AddMessaging();
 
-        builder.Services.AddHostedService<DataMigrator>();
+        builder.Services.AddSingleton<DataMigrator>();
+        builder.Services.AddHostedService<DataMigrator>(static sp => sp.GetRequiredService<DataMigrator>());
 
         builder.Services.AddElastic();
         builder.AddIngestion();

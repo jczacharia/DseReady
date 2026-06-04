@@ -73,6 +73,20 @@ public abstract class TestBed(ITestOutputHelper toh, TestFixture fixture) : IAsy
         return response;
     }
 
+    // Like Scenario, but with a caller-chosen timeout — long-running durable work (e.g. an ingestion driven by a
+    // domain event) needs far more than the default budget, and the tracked session is what guarantees the
+    // background handler has finished before the test returns (so teardown never races a live run).
+    protected async Task<IScenarioResult> TrackedHttp(Action<Scenario> configure, TimeSpan timeout)
+    {
+        IScenarioResult result = null!;
+        await Host.TrackActivity()
+            .Timeout(timeout)
+            .IgnoreMessagesMatchingType(IsInfrastructureMessage)
+            .ExecuteAndWaitAsync((Func<IMessageContext, Task>)(async _ => result = await Host.Scenario(configure)));
+        Out.WriteLine(await result.ReadAsTextAsync());
+        return result;
+    }
+
     protected async Task<(ITrackedSession Tracked, IScenarioResult Http)> TrackedScenario(
         Action<Scenario> configure,
         Action<ITrackedSession, IScenarioResult>? assert = null)

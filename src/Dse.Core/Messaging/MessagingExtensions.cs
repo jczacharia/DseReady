@@ -35,12 +35,10 @@ public static class MessagingExtensions
             // distributed node-agent assignment — the machinery that, under Balanced, floods the log trying to hand
             // agents to ghost node rows. Switch to Balanced for true multi-node on the shared SQL Server store.
             opts.Durability.Mode = DurabilityMode.Solo;
-            opts.MultipleHandlerBehavior = MultipleHandlerBehavior.Separated;
             opts.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
 
             opts.PersistMessagesWithSqlite(builder.Configuration.GetSqliteConnectionString());
             opts.UseEntityFrameworkCoreTransactions();
-            opts.UseEntityFrameworkCoreWolverineManagedMigrations();
             opts.PublishDomainEventsFromEntityFrameworkCore<IEntity>(x => x.Events);
 
             opts.Policies.AutoApplyTransactions();

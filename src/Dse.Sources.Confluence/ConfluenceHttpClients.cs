@@ -99,7 +99,7 @@ internal static class ConfluenceHttpClients
         UseCookies = false,
         AutomaticDecompression = DecompressionMethods.All,
         ConnectTimeout = TimeSpan.FromSeconds(10),
-        UseProxy = !string.IsNullOrEmpty(opts.Proxy),
+        UseProxy = opts.Proxy is { Length: > 0 } p1 && Uri.IsWellFormedUriString(p1, UriKind.Absolute),
         Proxy = opts.Proxy is { Length: > 0 } p && Uri.IsWellFormedUriString(p, UriKind.Absolute) ? new WebProxy(p) : null,
     };
 }

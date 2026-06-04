@@ -34,7 +34,7 @@ public enum IngestCheckpoint
 ///     metadata bag for phase-specific detail (index name, totals, failure reason, ...). A run owns an ordered list
 ///     of these; the history is the state.
 /// </summary>
-public sealed class IngestProgress : Entity, IDisposable
+public sealed class IngestProgress : Entity<Guid>, IDisposable
 {
     public IngestCheckpoint Checkpoint { get; init; } = IngestCheckpoint.Queued;
     public JsonDocument Metadata { get; init; } = JsonDocument.Parse("{}");
@@ -82,6 +82,7 @@ public sealed class IngestProgress : Entity, IDisposable
          """;
 
     public void Dispose() => Metadata.Dispose();
+    public override Guid Id { get; init; } = Guid.NewGuid();
 }
 
 public sealed class IngestProgressConfiguration : IEntityTypeConfiguration<IngestProgress>

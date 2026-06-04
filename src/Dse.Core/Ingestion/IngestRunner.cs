@@ -236,14 +236,12 @@ public sealed class IngestRunner<TDoc>(
         }
     }
 
-    // Reloads from the database so the runner defers to a terminal already recorded by the cancel endpoint instead
-    // of overwriting it.
-    private async Task<bool> StillActiveAsync(IngestRun run)
-    {
-        await db.Entry(run).ReloadAsync(CancellationToken.None);
-        await db.Entry(run).Collection(r => r.Phases).LoadAsync(CancellationToken.None);
-        return !run.IsTerminal;
-    }
+    // Asks the database directly whether this run still owns its single-flight slot, so the runner defers to a
+    // terminal another writer (the cancel endpoint) may have just committed instead of overwriting it. A
+    // no-tracking query reads committed state without depending on refreshing the tracked graph or its
+    // navigations; ActiveSourceKey is nulled the instant any terminal is reached.
+    private Task<bool> StillActiveAsync(IngestRun run) =>
+        db.IngestRuns.AsNoTracking().AnyAsync(r => r.Id == run.Id && r.ActiveSourceKey != null);
 
     private async Task SaveAsync(IngestRun run, CancellationToken ct)
     {

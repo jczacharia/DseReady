@@ -1,12 +1,14 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Dse.Auth;
 
+[ExcludeFromCodeCoverage]
 public sealed class LdapClaimsEnrichmentMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, IServiceProvider services)

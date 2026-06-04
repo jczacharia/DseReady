@@ -2,10 +2,12 @@
 
 
 using System.Diagnostics;
+using Dse;
 using Dse.Data;
 using Dse.Runtime;
 using Dse.Shared;
 using Dse.Tests;
+using Dse.Tests.Ingestion;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Mapping;
 using JasperFx.CommandLine;
@@ -18,7 +20,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Weasel.EntityFrameworkCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 
@@ -82,12 +83,22 @@ public sealed class TestFixture : IAsyncLifetime
 
             builder.ConfigureServices(services =>
             {
-                services.AddDatabaseCleaner<DataContext>();
-                services.AddInitialData<DataContext, DataMigrator>();
+                services.AddResourceSetupOnStartup(StartupAction.ResetState);
                 services.RunWolverineInSoloMode();
                 services
                     .AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
+
+                // CI has Elasticsearch but no Confluence: stub it at the HttpMessageHandler seam so the real
+                // ingest pipeline runs against deterministic, instantly-available data.
+                services.AddSingleton<StubConfluenceState>();
+                foreach (string client in new[] { "confluence", "confluence-readthrough" })
+                {
+                    services
+                        .AddHttpClient(client)
+                        .ConfigurePrimaryHttpMessageHandler(sp =>
+                            new StubConfluenceHandler(sp.GetRequiredService<StubConfluenceState>()));
+                }
             });
         }, new TestConfigurationExtension(builder =>
         {
@@ -95,7 +106,7 @@ public sealed class TestFixture : IAsyncLifetime
             builder.AddConfiguration(config.Build());
             builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Default"] = $"Data Source={_dbFilename}",
+                ["ConnectionStrings:sqlite"] = $"Data Source={_dbFilename}",
             });
         }));
 
@@ -104,12 +115,16 @@ public sealed class TestFixture : IAsyncLifetime
             context.Request.EnableBuffering();
         });
 
-        await TearDownAsync(_host.Services);
+        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
     }
 
     public async Task TearDownAsync(IServiceProvider services)
     {
+        // Schema + Source seed persist (owned by migrations); only the ingest data and Wolverine envelope state
+        // are reset between tests.
+        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
         await Host.ResetResourceState(Ct);
+        services.GetService<StubConfluenceState>()?.Reset();
 
         // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
         // We don't add it add all so behavior is the same.

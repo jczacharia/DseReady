@@ -15,7 +15,7 @@ namespace Dse.Ingestion;
 ///     releases the source's single-flight slot. Creating a run raises <see cref="IngestRunCreatedEvent" />, which
 ///     the EF transactional middleware publishes through Wolverine on save.
 /// </summary>
-public sealed class IngestRun : Entity
+public sealed class IngestRun : Entity<Guid>
 {
     private IngestRun() { }
 
@@ -61,6 +61,8 @@ public sealed class IngestRun : Entity
             ActiveSourceKey = null;
         }
     }
+
+    public override Guid Id { get; init; } = Guid.NewGuid();
 }
 
 public sealed class IngestRunConfiguration : IEntityTypeConfiguration<IngestRun>

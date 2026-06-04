@@ -6,7 +6,6 @@ using Dse.Shared;
 using Elastic.Ingest.Elasticsearch.Strategies;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Dse.Sources;

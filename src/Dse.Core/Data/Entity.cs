@@ -38,11 +38,6 @@ public abstract class Entity<TKey> : IEntity<TKey> where TKey : notnull
     }
 }
 
-public abstract class Entity : Entity<Guid>
-{
-    public sealed override Guid Id { get; init; } = Guid.NewGuid();
-}
-
 public sealed record EntityResponse<TKey>(TKey Id, Uri Location) where TKey : notnull;
 
 public static class EntityExtensions

@@ -8,8 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Thinktecture;
-using Weasel.Core;
-using Weasel.Sqlite;
 using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Data;
