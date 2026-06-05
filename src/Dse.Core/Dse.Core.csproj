@@ -36,8 +36,4 @@
     <PackageReference Include="WolverineFx.Sqlite" Version="5.39.3" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Search\" />
-  </ItemGroup>
-
 </Project>

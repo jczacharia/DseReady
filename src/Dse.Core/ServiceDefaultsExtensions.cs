@@ -54,6 +54,7 @@ public static class ServiceDefaultsExtensions
         builder.Services.AddMemoryCache();
         builder.Services.AddServiceDiscovery();
 
+        builder.RemoveWindowsEventLogProvider();
         builder.ConfigureOpenTelemetry();
         builder.AddDefaultHealthChecks();
 
@@ -70,6 +71,25 @@ public static class ServiceDefaultsExtensions
                 options.ValidateScopes = true;
                 options.ValidateOnBuild = true;
             });
+        }
+    }
+
+    // The generic host auto-adds a Windows Event Log provider whenever it runs on Windows. This service is a Linux
+    // container that logs to the console and OpenTelemetry on every platform — it has no Event Log to write to.
+    // Worse, the runtime project pins a linux-x64 RuntimeIdentifier, so on a dev Windows box the provider binds to
+    // the non-Windows System.Diagnostics.EventLog stub and throws PlatformNotSupportedException as the host eagerly
+    // builds its loggers. Drop it so startup is identical on every OS. (Provider construction is eager — a log-level
+    // filter can't prevent it; the descriptor has to go.)
+    private static void RemoveWindowsEventLogProvider(this IHostApplicationBuilder builder)
+    {
+        const string eventLogProvider = "Microsoft.Extensions.Logging.EventLog.EventLogLoggerProvider";
+
+        foreach (ServiceDescriptor descriptor in builder.Services
+                     .Where(d => d.ServiceType == typeof(ILoggerProvider)
+                                 && d.ImplementationType?.FullName == eventLogProvider)
+                     .ToList())
+        {
+            builder.Services.Remove(descriptor);
         }
     }
 
