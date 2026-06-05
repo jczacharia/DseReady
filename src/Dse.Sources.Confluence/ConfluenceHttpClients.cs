@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
 using Dse.Shared;
@@ -11,6 +12,7 @@ using Polly.Timeout;
 
 namespace Dse.Sources.Confluence;
 
+[ExcludeFromCodeCoverage]
 internal static class ConfluenceHttpClients
 {
     /// <summary>

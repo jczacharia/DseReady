@@ -25,6 +25,7 @@ using OpenTelemetry.Trace;
 
 namespace Dse;
 
+[ExcludeFromCodeCoverage]
 public static class ServiceDefaultsExtensions
 {
     public static void AddServiceDefaults(this IHostApplicationBuilder builder)

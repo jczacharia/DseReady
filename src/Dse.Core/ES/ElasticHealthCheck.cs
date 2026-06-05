@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Cluster;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -8,6 +9,7 @@ using HealthStatus = Elastic.Clients.Elasticsearch.HealthStatus;
 
 namespace Dse.ES;
 
+[ExcludeFromCodeCoverage]
 public sealed class ElasticHealthCheck(ElasticsearchClient elastic) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(

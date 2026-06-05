@@ -1,10 +1,12 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using FluentValidation;
 
 namespace Dse.ES;
 
+[ExcludeFromCodeCoverage]
 public sealed class ElasticOptions
 {
     public const string SectionName = "Elastic";

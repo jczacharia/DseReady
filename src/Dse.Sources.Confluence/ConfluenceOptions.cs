@@ -2,9 +2,11 @@
 
 
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Dse.Sources.Confluence;
 
+[ExcludeFromCodeCoverage]
 public sealed class ConfluenceOptions
 {
     public const string SectionName = "Confluence";

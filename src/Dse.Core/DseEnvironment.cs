@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,7 @@ public interface IDseLocalEnvironment : IDseEnvironment
     public string[] Roles { get; init; }
 }
 
+[ExcludeFromCodeCoverage]
 internal static class DseEnvironmentExtensions
 {
     private const string DeploymentEnvVar = "DEPLOYMENT_ENVIRONMENT";
@@ -89,6 +91,7 @@ internal static class DseEnvironmentExtensions
         }
     }
 
+    [ExcludeFromCodeCoverage]
     private class DseDeploymentEnvironment : IDseDeploymentEnvironment
     {
         public required string ApplicationName { get; set; }
@@ -98,6 +101,7 @@ internal static class DseEnvironmentExtensions
         public required DeploymentEnvironment Deployment { get; init; }
     }
 
+    [ExcludeFromCodeCoverage]
     private sealed class DseLocalEnvironment : IDseLocalEnvironment
     {
         public string ApplicationName { get; set; } = string.Empty;

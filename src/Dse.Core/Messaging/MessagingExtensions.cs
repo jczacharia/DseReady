@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Authentication;
 using Dse.Data;
 using Dse.Ingestion;
@@ -20,6 +21,7 @@ using SystemTextJsonSerializer = Wolverine.Runtime.Serialization.SystemTextJsonS
 
 namespace Dse.Messaging;
 
+[ExcludeFromCodeCoverage]
 public static class MessagingExtensions
 {
     public static void AddMessaging(this IHostApplicationBuilder builder)

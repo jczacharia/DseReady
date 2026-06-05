@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Transport;
@@ -9,6 +10,7 @@ using HealthStatus = Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus;
 
 namespace Dse.ES;
 
+[ExcludeFromCodeCoverage]
 public static class ElasticOptionsExtensions
 {
     public static void AddElastic(this IServiceCollection services)

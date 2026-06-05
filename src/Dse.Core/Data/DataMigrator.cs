@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Diagnostics.CodeAnalysis;
 using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,7 @@ namespace Dse.Data;
 ///     A single always-on pod with a disposable SQLite database makes applying migrations at startup the right
 ///     trade-off here (no farm, no concurrent migrators); EF's own migration lock guards the rest.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class DataMigrator(IEnumerable<SourceModule> modules, IServiceProvider sp) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
