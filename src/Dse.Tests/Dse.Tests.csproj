@@ -6,6 +6,7 @@
     <IsTestProject>true</IsTestProject>
     <ExcludeByFile>**/*.g.cs</ExcludeByFile>
     <ExcludeByAttribute>GeneratedCodeAttribute</ExcludeByAttribute>
+    <Exclude>[JasperFx*]*,[Wolverine*]*</Exclude>
   </PropertyGroup>
 
   <ItemGroup>
