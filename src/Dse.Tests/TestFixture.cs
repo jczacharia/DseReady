@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using Dse;
+using Dse.Auth;
 using Dse.Data;
 using Dse.Runtime;
 using Dse.Shared;
@@ -89,6 +90,11 @@ public sealed class TestFixture : IAsyncLifetime
                     .AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
 
+                // Program skips LDAP under the Test environment (no directory to reach). Register both directories
+                // here so the named-options wiring (AD vs OUD) is exercised against the real container; the
+                // connectors bind eagerly but only touch the network on GetMembershipsAsync, which tests never call.
+                services.AddLdapAd().AddLdapOud();
+
                 // CI has Elasticsearch but no Confluence: stub it at the HttpMessageHandler seam so the real
                 // ingest pipeline runs against deterministic, instantly-available data.
                 services.AddSingleton<StubConfluenceState>();
@@ -107,6 +113,15 @@ public sealed class TestFixture : IAsyncLifetime
             builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:sqlite"] = $"Data Source={_dbFilename}",
+
+                // Distinct per-directory values so a test can prove each named instance binds its OWN section
+                // (the regression was both binding nothing — every field came back string.Empty).
+                ["Ldap:Ad:Host"] = "ad.dse.test",
+                ["Ldap:Ad:SearchBase"] = "DC=ad,DC=dse,DC=test",
+                ["Ldap:Ad:GroupsAttribute"] = "memberOf",
+                ["Ldap:Oud:Host"] = "oud.dse.test",
+                ["Ldap:Oud:SearchBase"] = "o=dse-oud",
+                ["Ldap:Oud:GroupsAttribute"] = "groupMembership",
             });
         }));
 

@@ -20,6 +20,17 @@ public static class FluentOptions
         return builder;
     }
 
+    // A NAMED options instance whose name doubles as its configuration section path. One key (e.g. "Ldap:Ad") then
+    // identifies the options everywhere — at binding, at IOptionsMonitor.Get(name), and as the keyed-service key of
+    // whatever consumes it. Use when several instances of one options type must coexist (AD vs OUD). No default
+    // IOptions<T>/transient is registered: with multiple instances an un-named resolve would be ambiguous.
+    public static OptionsBuilder<TOptions> AddNamedFluentOptions<TOptions>(this IServiceCollection services, string name)
+        where TOptions : class =>
+        services.AddOptions<TOptions>(name)
+            .BindConfiguration(name)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
     public static OptionsBuilder<TOptions> WithFluentValidator<TOptions, TValidator>(this OptionsBuilder<TOptions> builder)
         where TOptions : class
         where TValidator : class, IValidator<TOptions>

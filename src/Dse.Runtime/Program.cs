@@ -153,9 +153,7 @@ internal sealed class Program
 
         app.UseAuthentication();
 
-        // In development DevAuth supplies entitlements directly; there is no directory to enrich against, so skip
-        // LDAP enrichment (it would otherwise fail to connect and fault every request).
-        if (!app.Environment.IsDevelopment())
+        if (!app.Environment.IsTest())
         {
             app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
         }

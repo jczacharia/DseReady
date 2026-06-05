@@ -10,8 +10,9 @@ namespace Dse.Auth;
 [ExcludeFromCodeCoverage]
 public static class LdapAuthDefaults
 {
-    public const string Ad = "Ldap.Ad";
-    public const string Oud = "Ldap.Oud";
+    // Doubles as the options name AND the configuration section path (Ldap → Ad / Oud).
+    public const string Ad = "Ldap:Ad";
+    public const string Oud = "Ldap:Oud";
 }
 
 [ExcludeFromCodeCoverage]
@@ -32,7 +33,7 @@ public static class LdapAuthExtensions
     public static IServiceCollection AddLdapAd(this IServiceCollection services)
     {
         services
-            .AddFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Ad)
+            .AddNamedFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Ad)
             .PostConfigure<IDseEnvironment>((options, env) =>
             {
                 options.Host = options.Host.Or("pncbank.com");
@@ -57,7 +58,7 @@ public static class LdapAuthExtensions
     public static IServiceCollection AddLdapOud(this IServiceCollection services)
     {
         services
-            .AddFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Oud)
+            .AddNamedFluentOptions<LdapAuthOptions>(LdapAuthDefaults.Oud)
             .PostConfigure<IDseEnvironment>((options, env) =>
             {
                 options.Host = options.Host.Or(env is IDseDeploymentEnvironment de
