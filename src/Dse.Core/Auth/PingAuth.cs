@@ -5,7 +5,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -20,7 +23,10 @@ public static class PingAuthDefaults
 }
 
 [ExcludeFromCodeCoverage]
-internal class ConfigurePingJwtBearerOptions(IDseEnvironment env) : IConfigureNamedOptions<JwtBearerOptions>
+internal class ConfigurePingJwtBearerOptions(
+    ILogger<ConfigurePingJwtBearerOptions> logger,
+    IDseEnvironment env,
+    IConfiguration cfg) : IConfigureNamedOptions<JwtBearerOptions>
 {
     public void Configure(string? name, JwtBearerOptions options)
     {
@@ -31,7 +37,7 @@ internal class ConfigurePingJwtBearerOptions(IDseEnvironment env) : IConfigureNa
 
         const string defaultUrl = "https://wfsso-apps.pnc.com/.well-known/openid-configuration";
 
-        string metadataAddress = env is IDseDeploymentEnvironment de
+        string metadataAddress = cfg["Ping:MetadataAddress"] ?? (env is IDseDeploymentEnvironment de
             ? de.Deployment switch
             {
                 DeploymentEnvironment.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
@@ -39,7 +45,7 @@ internal class ConfigurePingJwtBearerOptions(IDseEnvironment env) : IConfigureNa
                 DeploymentEnvironment.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
                 _ => defaultUrl,
             }
-            : defaultUrl;
+            : defaultUrl);
 
         options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
             metadataAddress,
@@ -63,23 +69,64 @@ internal class ConfigurePingJwtBearerOptions(IDseEnvironment env) : IConfigureNa
 
         options.Events = new JwtBearerEvents
         {
-            OnMessageReceived = ctx =>
+            OnMessageReceived = context =>
             {
-                if (ctx.HttpContext.Request.Cookies["PA.APP_DSS"] is { Length: > 0 } cookieJwt)
+                if (context.HttpContext.Request.Cookies[cfg["Ping:CookieName"] ?? "PA.APP_DSE"] is { Length: > 0 } cookieJwt)
                 {
-                    ctx.Token = cookieJwt;
+                    context.Token = cookieJwt;
                 }
 
                 return Task.CompletedTask;
             },
-            OnTokenValidated = ctx =>
+            OnTokenValidated = async context =>
             {
-                if (ctx.Principal?.Identity is ClaimsIdentity identity
-                    && identity.FindFirst("uid")?.Value is { Length: > 0 } uid)
+                if (context.Principal?.Identity is not ClaimsIdentity identity)
                 {
-                    identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
+                    return;
                 }
 
+
+                if (identity.FindFirst(cfg["Ping:IsMemberOfClaim"] ?? "isMemberOf")?.Value is { Length: > 0 } memberOf)
+                {
+                    foreach (string member in memberOf.Split(separator: '^',
+                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        identity.AddClaim(new Claim(ClaimTypes.Role, member));
+                    }
+                }
+
+                if (identity.FindFirst(cfg["Ping:UidClaim"] ?? "uid")?.Value is not { Length: > 0 } uid)
+                {
+                    return;
+                }
+
+                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
+
+                foreach (LdapConnector connector in context.HttpContext.RequestServices.GetServices<LdapConnector>())
+                {
+                    if (!connector.Bound)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        foreach (string membership in await connector.GetMembershipsAsync(uid))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Role, membership));
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "Failed to enrich claims from LDAP {LdapName} for user {Uid}", uid, connector.Name);
+                    }
+                }
+            },
+            OnChallenge = context =>
+            {
+                context.Response.Headers.Append("X-Auth-Challenge", context.Scheme.Name);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.HandleResponse();
                 return Task.CompletedTask;
             },
         };

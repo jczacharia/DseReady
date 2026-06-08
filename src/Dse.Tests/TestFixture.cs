@@ -2,9 +2,6 @@
 
 
 using System.Diagnostics;
-using Dse;
-using Dse.Auth;
-using Dse.Data;
 using Dse.Runtime;
 using Dse.Shared;
 using Dse.Tests;
@@ -22,7 +19,6 @@ using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 
 [assembly: CaptureConsole(CaptureError = true, CaptureOut = true)]
 [assembly: AssemblyFixture(typeof(TestFixture))]
@@ -39,13 +35,13 @@ public sealed class TestFixture : IAsyncLifetime
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
 
+    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
+
     private IAlbaHost? _host;
 
     private Process? _process;
     public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
 
     public async ValueTask InitializeAsync()
     {
@@ -90,15 +86,10 @@ public sealed class TestFixture : IAsyncLifetime
                     .AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
 
-                // Program skips LDAP under the Test environment (no directory to reach). Register both directories
-                // here so the named-options wiring (AD vs OUD) is exercised against the real container; the
-                // connectors bind eagerly but only touch the network on GetMembershipsAsync, which tests never call.
-                services.AddLdapAd().AddLdapOud();
-
                 // CI has Elasticsearch but no Confluence: stub it at the HttpMessageHandler seam so the real
                 // ingest pipeline runs against deterministic, instantly-available data.
                 services.AddSingleton<StubConfluenceState>();
-                foreach (string client in new[] { "confluence", "confluence-readthrough" })
+                foreach (string client in (string[])["confluence", "confluence-readthrough"])
                 {
                     services
                         .AddHttpClient(client)
@@ -113,9 +104,6 @@ public sealed class TestFixture : IAsyncLifetime
             builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:sqlite"] = $"Data Source={_dbFilename}",
-
-                // Distinct per-directory values so a test can prove each named instance binds its OWN section
-                // (the regression was both binding nothing — every field came back string.Empty).
                 ["Ldap:Ad:Host"] = "ad.dse.test",
                 ["Ldap:Ad:SearchBase"] = "DC=ad,DC=dse,DC=test",
                 ["Ldap:Ad:GroupsAttribute"] = "memberOf",
@@ -131,28 +119,6 @@ public sealed class TestFixture : IAsyncLifetime
         });
 
         await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
-    }
-
-    public async Task TearDownAsync(IServiceProvider services)
-    {
-        // Schema + Source seed persist (owned by migrations); only the ingest data and Wolverine envelope state
-        // are reset between tests.
-        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
-        await Host.ResetResourceState(Ct);
-        services.GetService<StubConfluenceState>()?.Reset();
-
-        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
-        // We don't add it add all so behavior is the same.
-
-        var esClient = services.GetRequiredService<ElasticsearchClient>();
-        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
-        {
-            string index = typeContext.ResolveIndexFormat();
-            Assert.StartsWith("test-", index);
-            await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
-            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
-            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
-        }
     }
 
     public async ValueTask DisposeAsync()
@@ -189,6 +155,28 @@ public sealed class TestFixture : IAsyncLifetime
         {
             _process.Dispose();
             _process = null;
+        }
+    }
+
+    public async Task TearDownAsync(IServiceProvider services)
+    {
+        // Schema + Source seed persist (owned by migrations); only the ingest data and Wolverine envelope state
+        // are reset between tests.
+        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
+        await Host.ResetResourceState(Ct);
+        services.GetService<StubConfluenceState>()?.Reset();
+
+        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
+        // We don't add it add all so behavior is the same.
+
+        var esClient = services.GetRequiredService<ElasticsearchClient>();
+        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
+        {
+            string index = typeContext.ResolveIndexFormat();
+            Assert.StartsWith("test-", index);
+            await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
+            await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
         }
     }
 

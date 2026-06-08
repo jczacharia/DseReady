@@ -3,7 +3,6 @@
 
 using AwesomeAssertions;
 using Dse.Sources;
-using Dse.Sources.Confluence;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Dse.Tests.Sources;
@@ -39,7 +38,8 @@ public sealed class SourcesValidatorTests
     public async Task StartAsync_WithDuplicateKeys_Throws()
     {
         // Two Confluence modules share the "confluence" key — a misconfiguration the validator must catch.
-        Func<Task> act = () => Validator(new Dse.Sources.Confluence.Confluence(), new Dse.Sources.Confluence.Confluence()).StartAsync(Ct);
+        Func<Task> act = () => Validator(new Dse.Sources.Confluence.Confluence(), new Dse.Sources.Confluence.Confluence())
+            .StartAsync(Ct);
 
         (await act.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("Duplicate source keys");
     }

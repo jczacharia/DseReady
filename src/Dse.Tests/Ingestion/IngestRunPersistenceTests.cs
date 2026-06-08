@@ -6,6 +6,7 @@ using Dse.Data;
 using Dse.Ingestion;
 using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Dse.Tests.Ingestion;
@@ -25,8 +26,8 @@ public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture
         Guid id;
         await using (AsyncServiceScope scope = Services.CreateAsyncScope())
         {
-            DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
-            IngestRun run = IngestRun.Create(Confluence);
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var run = IngestRun.Create(Confluence);
             db.IngestRuns.Add(run);
             await db.SaveChangesAsync(Ct);
             id = run.Id;
@@ -34,7 +35,7 @@ public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture
 
         await using (AsyncServiceScope scope = Services.CreateAsyncScope())
         {
-            DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
             IngestRun run = await db.IngestRuns.FirstAsync(r => r.Id == id, Ct);
 
             run.Advance(IngestProgress.At(IngestCheckpoint.Started));
@@ -46,7 +47,7 @@ public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture
 
         await using (AsyncServiceScope scope = Services.CreateAsyncScope())
         {
-            DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
             IngestRun run = await db.IngestRuns.AsNoTracking().FirstAsync(r => r.Id == id, Ct);
             run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Succeeded);
             run.IsTerminal.Should().BeTrue();
@@ -62,10 +63,10 @@ public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            foreach (var entry in ex.Entries)
+            foreach (EntityEntry entry in ex.Entries)
             {
                 Out.WriteLine($"CONFLICT entity={entry.Entity.GetType().Name} state={entry.State}");
-                foreach (var p in entry.Properties)
+                foreach (PropertyEntry p in entry.Properties)
                 {
                     Out.WriteLine(
                         $"  {p.Metadata.Name}: current='{p.CurrentValue}' original='{p.OriginalValue}' modified={p.IsModified} token={p.Metadata.IsConcurrencyToken}");

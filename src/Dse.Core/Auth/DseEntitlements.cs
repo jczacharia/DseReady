@@ -8,6 +8,6 @@ namespace Dse.Auth;
 [ExcludeFromCodeCoverage]
 public static class DseEntitlements
 {
-    public const string KibanaAdminOudDn = "cn=app-dse-kibana-admin,ou=Groups,o=pnc";
-    public const string KibanaReadonlyOudDn = "cn=app-dse-kibana-user-readonly,ou=Groups,o=pnc";
+    public const string KibanaAdminOudDn = "app-dse-kibana-admin";
+    public const string KibanaReadonlyOudDn = "app-dse-kibana-user-readonly";
 }

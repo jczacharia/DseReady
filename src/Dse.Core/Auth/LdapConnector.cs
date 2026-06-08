@@ -3,6 +3,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Dse.Shared;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -18,8 +19,9 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     private readonly IOptionsMonitor<LdapAuthOptions> _monitor = services.GetRequiredService<IOptionsMonitor<LdapAuthOptions>>();
     private readonly SemaphoreSlim _semaphore = new(initialCount: 1, maxCount: 1);
     private LdapConnection? _connection;
-    private LdapAuthOptions Options => _monitor.Get(name);
+    public LdapAuthOptions Options => _monitor.Get(name);
     public string Name => name;
+    public bool Bound => _connection?.Bound == true;
 
     public void Dispose()
     {
@@ -27,7 +29,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
         _semaphore.Dispose();
     }
 
-    private async Task<LdapConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
+    public async Task<LdapConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
     {
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -44,6 +46,8 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
 
                 _connection = new LdapConnection(ldapOpts);
             }
+
+            _connection.ConnectionTimeout = Options.ConnectionTimeout.Milliseconds;
 
             await _connection.ConnectAsync(Options.Host, Options.Port, cancellationToken)
                 .ConfigureAwait(false);
@@ -64,42 +68,47 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     }
 
     public ValueTask<IReadOnlySet<string>> GetMembershipsAsync(string uid) =>
-        new(_cache.GetOrCreateAsync($"{name}:memberships:{uid}", entry =>
+        new(_cache.GetOrCreateAsync($"{name}:memberships:{uid}", _ => SearchAdAsync(uid), new MemoryCacheEntryOptions
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-            return SearchAdAsync(uid);
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
         })!);
 
     private async Task<IReadOnlySet<string>> SearchAdAsync(string uid)
     {
         LdapConnection conn = await GetConnectionAsync().ConfigureAwait(false);
 
+        string? groupFilter = Options.GroupsFilter?.Invoke(EscapeFilter(uid));
+
         ILdapSearchResults results = await conn.SearchAsync(
                 Options.SearchBase,
                 LdapConnection.ScopeSub,
-                Options.GroupsFilter?.Invoke(EscapeFilter(uid)),
+                groupFilter,
                 [Options.GroupsAttribute],
                 typesOnly: false)
             .ConfigureAwait(false);
 
-        HashSet<string> set = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> memberships = new(StringComparer.OrdinalIgnoreCase);
 
         await foreach (LdapEntry entry in results.ConfigureAwait(false))
         {
-            if (entry.GetOrDefault(Options.GroupsAttribute) is { } attr)
+            LdapAttribute? attr = entry.GetAttributeSet()
+                .FirstOrDefault(a => string.Equals(a.Key, Options.GroupsAttribute, StringComparison.OrdinalIgnoreCase))
+                .Value;
+
+            if (attr is not null)
             {
-                foreach (string dn in attr.StringValueArray)
+                foreach (string val in attr.StringValueArray)
                 {
-                    set.Add(dn);
+                    DistinguishedName dn = DistinguishedName.Parse(val);
+                    if (dn.GetAttributeString("cn") is { } cn)
+                    {
+                        memberships.Add(cn);
+                    }
                 }
             }
-
-#pragma warning disable S1751 // uid is unique — first matching entry is THE user; rest of the result stream is wasted.
-            break;
-#pragma warning restore S1751
         }
 
-        return set;
+        return memberships;
     }
 
     private static string EscapeFilter(string s)

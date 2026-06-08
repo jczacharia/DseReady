@@ -10,5 +10,5 @@ public sealed class JsonDocumentValueConverter() : ValueConverter<JsonDocument, 
     doc => doc.RootElement.GetRawText(),
     json => JsonDocument.Parse(json, s_docOpts))
 {
-    private static readonly JsonDocumentOptions s_docOpts = new() { MaxDepth = 64, };
+    private static readonly JsonDocumentOptions s_docOpts = new() { MaxDepth = 64 };
 }

@@ -4,7 +4,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Authentication;
 using Dse.Data;
-using Dse.Ingestion;
 using Dse.Ingestion.Events;
 using Dse.Shared;
 using Humanizer;

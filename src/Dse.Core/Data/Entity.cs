@@ -25,17 +25,14 @@ public interface IEntity<TKey> : IEntity where TKey : notnull
 
 public abstract class Entity<TKey> : IEntity<TKey> where TKey : notnull
 {
+    private readonly List<object> _events = [];
     public abstract TKey Id { get; init; }
     public virtual DateTimeOffset CreatedAt { get; set; }
     public virtual DateTimeOffset? UpdatedAt { get; set; }
-
-    private readonly List<object> _events = [];
     IReadOnlyList<IDomainEvent> IEntity.Events => _events.OfType<IDomainEvent>().ToList();
 
-    public void Publish(IDomainEvent e)
-    {
+    public void Publish(IDomainEvent e) =>
         _events.Add(e);
-    }
 }
 
 public sealed record EntityResponse<TKey>(TKey Id, Uri Location) where TKey : notnull;

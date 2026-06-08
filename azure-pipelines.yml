@@ -31,6 +31,8 @@ variables:
     value: "quality_engineering/DseDataPipelines-services"
   - name: publish_proj
     value: "src/Dse.Runtime/Dse.Runtime.csproj"
+  - name: runtime_identifier
+    value: "linux-x64"
 
 resources:
   repositories:

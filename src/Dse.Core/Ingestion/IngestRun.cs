@@ -32,6 +32,8 @@ public sealed class IngestRun : Entity<Guid>
     public IngestProgress CurrentProgress => Phases.OrderBy(p => p.CreatedAt).Last();
     public bool IsTerminal => CurrentProgress.IsTerminal;
 
+    public override Guid Id { get; init; } = Guid.NewGuid();
+
     public static IngestRun Create(SourceKey sourceKey, bool dryRun = false)
     {
         IngestRun run = new()
@@ -61,8 +63,6 @@ public sealed class IngestRun : Entity<Guid>
             ActiveSourceKey = null;
         }
     }
-
-    public override Guid Id { get; init; } = Guid.NewGuid();
 }
 
 public sealed class IngestRunConfiguration : IEntityTypeConfiguration<IngestRun>

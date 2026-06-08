@@ -1,18 +1,15 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Claims;
 using Dse.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Dse.Auth;
 
-[ExcludeFromCodeCoverage]
 public static class AuthExtensions
 {
     public static bool IsAnonymous(this ClaimsPrincipal user) =>
@@ -48,8 +45,7 @@ public static class AuthExtensions
                     return Task.FromResult(true);
                 }
 
-                httpContext.SetProblem(HttpStatusCode.Forbidden, "Missing Entitlements",
-                    "User does not have the required entitlements to perform this action.");
+                httpContext.SetProblem(InsufficientEntitlementsProblem());
                 return Task.FromResult(false);
             });
     }

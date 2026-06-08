@@ -2,6 +2,7 @@
 
 
 using System.Diagnostics.CodeAnalysis;
+using Dse.Auth;
 using Dse.Data;
 using Dse.ES;
 using Dse.Ingestion;
@@ -47,6 +48,9 @@ public static class ServiceDefaultsExtensions
 
         builder.Services.AddElastic();
         builder.AddIngestion();
+
+        builder.Services.AddLdapAd();
+        builder.Services.AddLdapOud();
 
         builder.Services.AddProblemDetails(static s => s.ApplyCoreCustomization());
         builder.Services.ConfigureHttpClientDefaults(static o => o.RemoveAllLoggers());

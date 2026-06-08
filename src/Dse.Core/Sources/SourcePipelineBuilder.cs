@@ -25,10 +25,10 @@ public sealed class SourcePipelineBuilder : IEndpointRouteBuilder, IEndpointConv
     public SourceKey SourceKey { get; }
     private IEndpointRouteBuilder Endpoints => _group;
 
+    public void Add(Action<EndpointBuilder> convention) => ((IEndpointConventionBuilder)_group).Add(convention);
+    public void Finally(Action<EndpointBuilder> finalConvention) => ((IEndpointConventionBuilder)_group).Finally(finalConvention);
+
     public IServiceProvider ServiceProvider => Endpoints.ServiceProvider;
     ICollection<EndpointDataSource> IEndpointRouteBuilder.DataSources => Endpoints.DataSources;
     IApplicationBuilder IEndpointRouteBuilder.CreateApplicationBuilder() => Endpoints.CreateApplicationBuilder();
-
-    public void Add(Action<EndpointBuilder> convention) => ((IEndpointConventionBuilder)_group).Add(convention);
-    public void Finally(Action<EndpointBuilder> finalConvention) => ((IEndpointConventionBuilder)_group).Finally(finalConvention);
 }

@@ -46,11 +46,10 @@ public sealed partial class SourceKey
 
 public sealed class Source : Entity<SourceKey>
 {
+    private Source() { }
     public override required SourceKey Id { get; init; }
     public string AssemblyQualifiedName { get; private init; } = null!;
     public SourceModule GetModule() => Type.GetType(AssemblyQualifiedName)!.GetRequiredSourceModule();
-
-    private Source() { }
 
     public static Source FromType(Type type)
     {

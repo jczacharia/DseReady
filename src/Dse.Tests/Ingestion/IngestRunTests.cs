@@ -34,13 +34,13 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
 
         await Http(s =>
         {
-            s.Post.Url($"/sources/{key}/ingest");
+            s.Post.Url($"/sources/{key}/ingest?dryRun=false");
             s.StatusCodeShouldBe(HttpStatusCode.Unauthorized);
         });
 
         await Http(s =>
         {
-            s.Post.Url($"/sources/{key}/ingest");
+            s.Post.Url($"/sources/{key}/ingest?dryRun=false");
             s.WithUser(s_readonly);
             s.StatusCodeShouldBe(HttpStatusCode.Forbidden);
         });
@@ -135,8 +135,8 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
             s.StatusCodeShouldBe(HttpStatusCode.Accepted);
         });
 
-        Stub.Release();   // belt-and-suspenders; cancellation already trips the parked fetch.
-        await ingest;     // the handler defers to the recorded terminal and completes; teardown is now safe.
+        Stub.Release(); // belt-and-suspenders; cancellation already trips the parked fetch.
+        await ingest; // the handler defers to the recorded terminal and completes; teardown is now safe.
 
         IngestRun run = await ReadRunAsync(runId);
         run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Canceled);
@@ -163,7 +163,7 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
         // A plain save does not flush domain events, so no background runner is started — the run simply holds
         // the source's single-flight slot, which is all these control-plane assertions need.
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
-        DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
+        var db = scope.ServiceProvider.GetRequiredService<DataContext>();
         db.IngestRuns.Add(IngestRun.Create(key));
         await db.SaveChangesAsync(Ct);
     }
@@ -171,7 +171,7 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     private async Task<Guid> ActiveRunIdAsync(SourceKey key)
     {
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
-        DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
+        var db = scope.ServiceProvider.GetRequiredService<DataContext>();
         return await db.IngestRuns
             .Where(r => r.SourceKey == key && r.ActiveSourceKey != null)
             .Select(r => r.Id)
@@ -181,7 +181,7 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     private async Task<IngestRun> ReadRunAsync(Guid runId)
     {
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
-        DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
+        var db = scope.ServiceProvider.GetRequiredService<DataContext>();
         return await db.IngestRuns.AsNoTracking().FirstAsync(r => r.Id == runId, Ct);
     }
 

@@ -5,7 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.Routing;
 
 namespace Dse.Sources;
 

@@ -1,19 +1,21 @@
 ﻿// Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using Dse.Ingestion;
 using Dse.Ingestion.Endpoints;
 using Dse.Shared;
+using Dse.Sources;
+using Dse.Sources.Confluence;
 using Elastic.Mapping;
 using Microsoft.AspNetCore.Builder;
+using Wolverine.Attributes;
+
+[assembly: SourceManifest<Confluence>]
+[assembly: WolverineModule]
 
 namespace Dse.Sources.Confluence;
 
 public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
 {
-    /// <summary>The AD group DN that gates Confluence search.</summary>
-    public const string AdEntitlementDn = "CN=GSGu_CFL_CFLUsers,OU=OUg_Applications,OU=OUc_AccessGroups,DC=pncbank,DC=com";
-
     public override ElasticsearchTypeContext GetTypeContext(IDseEnvironment dseEnv) => dseEnv.IsTest()
         ? ConfluenceContext.ConfluenceDocTest.CreateContext(Guid.NewGuid().ToString())
         : ConfluenceContext.ConfluenceDoc.Context with { IndexPatternUseBatchDate = true };
@@ -40,12 +42,16 @@ public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
 
     public override void Configure(SourcePipelineBuilder builder)
     {
-        builder
-            .MapSearchEndpoint()
-            .RequireAuthorization(p => p.RequireRole(AdEntitlementDn));
-
         builder.MapIngestEndpoints();
         builder.MapGetIngestRunEndpoint();
         builder.MapCancelIngestRunEndpoint();
+
+        builder
+            .MapSearchEndpoint()
+            .RequireAuthorization(p => p.RequireConfluenceEntitlement());
+
+        builder
+            .MapConfluenceBodyViewEndpoint()
+            .RequireAuthorization(p => p.RequireConfluenceEntitlement());
     }
 }

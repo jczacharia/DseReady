@@ -48,13 +48,6 @@ public sealed class IngestProgress : Entity<Guid>, IDisposable
 
     public Guid RunId { get; init; }
 
-    /// <summary>A checkpoint carrying no live counters — for control-plane transitions (cancel, interrupt, ...).</summary>
-    public static IngestProgress At(IngestCheckpoint checkpoint, object? metadata = null) => new()
-    {
-        Checkpoint = checkpoint,
-        Metadata = metadata is null ? JsonDocument.Parse("{}") : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
-    };
-
     public long TotalToProduce { get; init; }
     public TimeSpan Elapsed { get; init; }
     public double PercentComplete { get; init; }
@@ -72,6 +65,17 @@ public sealed class IngestProgress : Entity<Guid>, IDisposable
         Checkpoint == IngestCheckpoint.Faulted ||
         Checkpoint == IngestCheckpoint.Succeeded;
 
+    public override Guid Id { get; init; } = Guid.NewGuid();
+
+    public void Dispose() => Metadata.Dispose();
+
+    /// <summary>A checkpoint carrying no live counters — for control-plane transitions (cancel, interrupt, ...).</summary>
+    public static IngestProgress At(IngestCheckpoint checkpoint, object? metadata = null) => new()
+    {
+        Checkpoint = checkpoint,
+        Metadata = metadata is null ? JsonDocument.Parse("{}") : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
+    };
+
     public override string ToString() =>
         $"""
          runId:       {RunId}
@@ -86,9 +90,6 @@ public sealed class IngestProgress : Entity<Guid>, IDisposable
          timestamp:   {CreatedAt:s}
          metadata:    {JsonSerializer.Serialize(Metadata, JsonDefaults.Pretty)}
          """;
-
-    public void Dispose() => Metadata.Dispose();
-    public override Guid Id { get; init; } = Guid.NewGuid();
 }
 
 public sealed class IngestProgressConfiguration : IEntityTypeConfiguration<IngestProgress>

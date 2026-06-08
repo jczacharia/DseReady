@@ -10,7 +10,6 @@ using Dse.Sources;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 
 namespace Dse.Ingestion.Endpoints;
@@ -19,9 +18,8 @@ public static class CancelIngestRunEndpoint
 {
     public static RouteHandlerBuilder MapCancelIngestRunEndpoint(
         this SourcePipelineBuilder builder,
-        [StringSyntax("Route")] string pattern = "ingest/{runId:guid}/cancel")
-    {
-        return builder.MapPost(pattern, async Task<Results<Accepted, ProblemHttpResult>> (
+        [StringSyntax("Route")] string pattern = "ingest/{runId:guid}/cancel") =>
+        builder.MapPost(pattern, async Task<Results<Accepted, ProblemHttpResult>> (
                 Guid runId,
                 HttpContext context,
                 DataContext db,
@@ -49,5 +47,4 @@ public static class CancelIngestRunEndpoint
                 return TypedResults.Accepted((string?)null);
             })
             .RequireAuthorization(p => p.RequireKibanaAdminEntitlement());
-    }
 }

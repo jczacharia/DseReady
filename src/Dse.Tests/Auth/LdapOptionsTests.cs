@@ -52,7 +52,8 @@ public sealed class LdapOptionsTests(ITestOutputHelper toh, TestFixture fixture)
         LdapConnector[] connectors = Services.GetServices<LdapConnector>().ToArray();
 
         connectors.Select(c => c.Name)
-            .Should().BeEquivalentTo([LdapAuthDefaults.Ad, LdapAuthDefaults.Oud]);
+            .Should()
+            .BeEquivalentTo(LdapAuthDefaults.Ad, LdapAuthDefaults.Oud);
 
         // Each connector reads Monitor.Get(its-own-Name); none of them should see an empty Host (the bug).
         foreach (LdapConnector connector in connectors)

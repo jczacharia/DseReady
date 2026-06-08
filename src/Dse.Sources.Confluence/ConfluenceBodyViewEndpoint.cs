@@ -6,7 +6,6 @@ using HtmlAgilityPack;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using Polly.Timeout;
 
 namespace Dse.Sources.Confluence;
@@ -25,8 +24,8 @@ public static class ConfluenceBodyViewEndpoint
     private static readonly HashSet<string> s_allowedRepresentations =
         new(StringComparer.Ordinal) { "export_view", "anonymous_export_view", "view" };
 
-    public static void MapConfluenceBodyViewEndpoint(this IEndpointRouteBuilder builder) => builder
-        .MapGet("sources/confluence/content/{contentId}/body-view", async Task<IResult> (
+    public static RouteHandlerBuilder MapConfluenceBodyViewEndpoint(this SourcePipelineBuilder builder) => builder
+        .MapGet("content/{contentId}/body-view", async Task<IResult> (
             string contentId,
             [FromQuery] string? bodyExport,
             IHttpClientFactory httpClientFactory,

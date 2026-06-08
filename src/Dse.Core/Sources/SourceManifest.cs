@@ -1,11 +1,10 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Dse.Sources;
 
-[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Assembly)]
 public abstract class SourceManifestAttribute(Type moduleType) : Attribute
 {
@@ -14,7 +13,15 @@ public abstract class SourceManifestAttribute(Type moduleType) : Attribute
             $"Type {moduleType} does not implement {nameof(SourceModule)}.");
 }
 
-[ExcludeFromCodeCoverage]
 [AttributeUsage(AttributeTargets.Assembly)]
 public sealed class SourceManifestAttribute<TModule>()
     : SourceManifestAttribute(typeof(TModule)) where TModule : SourceModule, new();
+
+public static class SourceManifestExtensions
+{
+    public static void AddSourceManifest<T>(this IServiceCollection services)
+    {
+        SourceModule module = typeof(T).GetRequiredSourceModule();
+        module.Register(services);
+    }
+}

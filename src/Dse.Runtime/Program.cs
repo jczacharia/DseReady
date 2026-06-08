@@ -4,16 +4,12 @@
 using System.Diagnostics.CodeAnalysis;
 using Dse.Auth;
 using Dse.Ingestion.Endpoints;
-using Dse.Shared;
 using Dse.Sources;
 using Dse.Sources.Confluence;
 using JasperFx;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Thinktecture.Swashbuckle;
 
@@ -32,7 +28,7 @@ internal sealed class Program
         }
         catch (Exception ex)
         {
-            //OpenShift/Helm last-resort visibility
+            // OpenShift/Helm last-resort visibility
             // ValidateOnBuild and other startup failures throw
             // before the logging pipeline has a chance to flush. Write straight to stderr
             // so OpenShift `oc logs` shows the real cause instead of a silent exit.
@@ -65,22 +61,14 @@ internal sealed class Program
                     Title = "DSE",
                     Description = "Enterprise Search",
                 });
+
+                // MapHealthChecks endpoints have no MethodInfo, so the ApiExplorer can't see them — publish them.
+                options.DocumentFilter<HealthCheckDocumentFilter>();
             })
             .AddThinktectureOpenApiFilters();
 
-        builder.Services.AddSignalR(e =>
-        {
-            if (!builder.Environment.IsProduction())
-            {
-                e.EnableDetailedErrors = true;
-            }
-        });
-
         if (builder.Environment.EnvironmentName != "Test")
         {
-            builder.Services.AddLdapAd();
-            builder.Services.AddLdapOud();
-
             builder.Services
                 .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
                 .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", configureOptions: null)
@@ -118,16 +106,22 @@ internal sealed class Program
 
         // Skip HTTPS redirect in-container: OpenShift Routes do edge TLS termination,
         // so the pod listens plain HTTP on 8080. A redirect here would 307 every probe.
-        if (!builder.Environment.IsProduction())
-        {
-            app.UseHttpsRedirection();
-        }
 
         app.UseStaticFiles();
 
         // Pinned servers URL override (env OpenApi__ExternalBaseUrl) — safety net if apache's
         // X-Forwarded-Prefix isn't set yet.
-        string? configuredExternalBase = app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/');
+        string? configuredExternalBase =
+            app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/') ??
+            (app.Services.GetRequiredService<IDseEnvironment>() is IDseDeploymentEnvironment de
+                ? de.Deployment switch
+                {
+                    DeploymentEnvironment.Rnd => "https://search-rnd.pncint.net/adv/api",
+                    DeploymentEnvironment.Uat => "https://search-uat.pncint.net/adv/api",
+                    DeploymentEnvironment.Qa => "https://search-qa.pncint.net/adv/api",
+                    _ => "https://search.pncint.net/adv/api",
+                }
+                : null);
 
         app.UseSwagger(o =>
         {
@@ -136,8 +130,7 @@ internal sealed class Program
             // Without an explicit servers entry, "Try it out" fires at /api/... missing the /adv prefix.
             o.PreSerializeFilters.Add((document, httpReq) =>
             {
-                string url = configuredExternalBase
-                             ?? $"{httpReq.Scheme}://{httpReq.Host.Value}{httpReq.PathBase}";
+                string url = configuredExternalBase ?? $"{httpReq.Scheme}://{httpReq.Host.Value}{httpReq.PathBase}";
                 document.Servers = [new OpenApiServer { Url = url }];
             });
         });
@@ -154,17 +147,11 @@ internal sealed class Program
         app.MapDefaultHealthChecks().AllowAnonymous();
 
         app.UseAuthentication();
-
-        if (!app.Environment.IsTest())
-        {
-            app.UseMiddleware<LdapClaimsEnrichmentMiddleware>();
-        }
-
         app.UseAuthorization();
 
         RouteGroupBuilder sources = app.MapGroup("sources").RequireAuthorization();
 
-        foreach (var module in app.Services.GetServices<SourceModule>())
+        foreach (SourceModule module in app.Services.GetServices<SourceModule>())
         {
             module.Configure(sources);
         }

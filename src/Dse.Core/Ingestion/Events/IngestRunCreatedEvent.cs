@@ -27,7 +27,7 @@ public sealed class IngestRunCreatedHandler
     {
         await using AsyncServiceScope scope = services.CreateAsyncScope();
         IServiceProvider sp = scope.ServiceProvider;
-        DataContext db = sp.GetRequiredService<DataContext>();
+        var db = sp.GetRequiredService<DataContext>();
 
         if (await db.IngestRuns.FirstOrDefaultAsync(r => r.Id == message.RunId, ct) is not { } run)
         {

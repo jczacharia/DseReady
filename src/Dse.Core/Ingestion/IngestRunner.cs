@@ -32,10 +32,11 @@ public sealed class IngestRunner<TDoc>(
     private readonly ElasticsearchTypeContext _typeContext = services
         .GetRequiredKeyedService<ElasticsearchTypeContext>(typeof(TDoc).GetRequiredSourceKey());
 
+    private IngestCheckpoint _checkpoint = IngestCheckpoint.Queued;
+
     // Non-zero fails the run and skips alias promotion so an incomplete index is never aliased.
     private long _failedDocuments;
     private long _produced;
-    private IngestCheckpoint _checkpoint = IngestCheckpoint.Queued;
 
     public long Produced => Interlocked.Read(ref _produced);
     public TimeSpan Elapsed => _stopwatch.Elapsed;

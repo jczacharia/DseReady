@@ -170,7 +170,7 @@ public sealed class ConfluenceDocConfiguration : SourceDocOptions<ConfluenceDoc>
             .Type(b => b.DseKeyword())
             .Title(b => b.DseKeyword())
             .Body(b => b.DseText())
-            .Space(b => b.Name(n => n.DseKeyword()))
+            .Space(b => b.Key(k => k.DseKeyword()).Name(n => n.DseKeyword()))
             .VersionBy(v => v.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
             .CreatedBy(c => c.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
             .Ancestors(a => a.Title(t => t.DseKeyword()))

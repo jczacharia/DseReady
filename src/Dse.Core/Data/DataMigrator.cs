@@ -20,7 +20,7 @@ public sealed class DataMigrator(IEnumerable<SourceModule> modules, IServiceProv
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using AsyncServiceScope scope = sp.CreateAsyncScope();
-        DataContext context = scope.ServiceProvider.GetRequiredService<DataContext>();
+        var context = scope.ServiceProvider.GetRequiredService<DataContext>();
 
         await context.Database.MigrateAsync(cancellationToken);
         await Populate(context, cancellationToken);

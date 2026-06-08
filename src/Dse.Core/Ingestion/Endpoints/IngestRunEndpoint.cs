@@ -21,31 +21,21 @@ public static class IngestRunEndpoint
 {
     public static RouteHandlerBuilder MapIngestEndpoints(
         this SourcePipelineBuilder builder,
-        [StringSyntax("Route")] string pattern = "ingest")
-    {
-        return builder.MapPost(pattern, async Task<Results<AcceptedAtRoute<EntityResponse<Guid>>, ProblemHttpResult>> (
+        [StringSyntax("Route")] string pattern = "ingest") =>
+        builder.MapPost(pattern, async Task<Results<AcceptedAtRoute<EntityResponse<Guid>>, ProblemHttpResult>> (
             [FromQuery] bool? dryRun,
             IDbContextOutbox<DataContext> outlet,
             HttpContext context,
             CancellationToken ct) =>
         {
-            if (dryRun == true)
+            bool fullRun = !(dryRun ?? true);
+
+            if (fullRun && !context.User.IsInRole(DseEntitlements.KibanaAdminOudDn))
             {
-                if (!context.User.IsInRole(DseEntitlements.KibanaAdminOudDn) &&
-                    !context.User.IsInRole(DseEntitlements.KibanaReadonlyOudDn))
-                {
-                    return TypedResults.Problem(AuthExtensions.InsufficientEntitlementsProblem());
-                }
-            }
-            else
-            {
-                if (!context.User.IsInRole(DseEntitlements.KibanaAdminOudDn))
-                {
-                    return TypedResults.Problem(AuthExtensions.InsufficientEntitlementsProblem());
-                }
+                return TypedResults.Problem(AuthExtensions.InsufficientEntitlementsProblem());
             }
 
-            IngestRun run = IngestRun.Create(builder.SourceKey, dryRun == true);
+            var run = IngestRun.Create(builder.SourceKey, !fullRun);
             outlet.DbContext.IngestRuns.Add(run);
 
             // SQLite SQLITE_CONSTRAINT_UNIQUE; the filtered unique index on ActiveSourceKey is what trips it.
@@ -63,5 +53,4 @@ public static class IngestRunEndpoint
 
             return context.EntityAccepted(run.Id, $"{builder.SourceKey}-GetIngestRun", new { runId = run.Id });
         });
-    }
 }

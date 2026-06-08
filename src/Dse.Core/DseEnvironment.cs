@@ -3,9 +3,9 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using Dse.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -43,42 +43,18 @@ internal static class DseEnvironmentExtensions
 {
     private const string DeploymentEnvVar = "DEPLOYMENT_ENVIRONMENT";
 
-    public static void AddDseEnvironment(this IServiceCollection services)
-    {
-        if (IDseEnvironment.IsRelease)
+    public static void AddDseEnvironment(this IServiceCollection services) =>
+        services.AddSingleton<IDseEnvironment>(sp =>
         {
-            services.AddSingleton<IDseEnvironment, DseDeploymentEnvironment>(sp =>
+            var cfg = sp.GetRequiredService<IConfiguration>();
+            var hostEnv = sp.GetRequiredService<IHostEnvironment>();
+
+            if (!IDseEnvironment.IsRelease)
             {
-                var cfg = sp.GetRequiredService<IConfiguration>();
-                var hostEnv = sp.GetRequiredService<IHostEnvironment>();
-
-                string? deploymentCfg = cfg[DeploymentEnvVar]?.Trim();
-                if (!Enum.TryParse<DeploymentEnvironment>(deploymentCfg, ignoreCase: true, out var deploymentEnv))
-                {
-                    throw new InvalidOperationException($"Unrecognized {DeploymentEnvVar} value '{deploymentCfg}'.");
-                }
-
-                return new DseDeploymentEnvironment
-                {
-                    ApplicationName = hostEnv.ApplicationName,
-                    ContentRootFileProvider = hostEnv.ContentRootFileProvider,
-                    ContentRootPath = hostEnv.ContentRootPath,
-                    EnvironmentName = hostEnv.EnvironmentName,
-                    Deployment = deploymentEnv,
-                };
-            });
-        }
-        else
-        {
-            services.AddSingleton<IDseEnvironment, DseLocalEnvironment>(sp =>
-            {
-                var cfg = sp.GetRequiredService<IConfiguration>();
-                var hostEnv = sp.GetRequiredService<IHostEnvironment>();
-
                 ArgumentException.ThrowIfNullOrWhiteSpace(cfg["Local:Username"], "Missing Local:Username configuration value.");
                 ArgumentException.ThrowIfNullOrWhiteSpace(cfg["Local:Password"], "Missing Local:Password configuration value.");
 
-                var env = new DseLocalEnvironment
+                DseLocalEnvironment env = new()
                 {
                     ApplicationName = hostEnv.ApplicationName,
                     ContentRootFileProvider = hostEnv.ContentRootFileProvider,
@@ -87,27 +63,53 @@ internal static class DseEnvironmentExtensions
                 };
                 cfg.Bind("Local", env);
                 return env;
-            });
-        }
-    }
+            }
+
+            if (hostEnv.IsTest())
+            {
+                return new DseEnvironment
+                {
+                    ApplicationName = hostEnv.ApplicationName,
+                    ContentRootFileProvider = hostEnv.ContentRootFileProvider,
+                    ContentRootPath = hostEnv.ContentRootPath,
+                    EnvironmentName = hostEnv.EnvironmentName,
+                };
+            }
+
+            string? deploymentCfg = cfg[DeploymentEnvVar]?.Trim();
+            if (!Enum.TryParse(deploymentCfg, ignoreCase: true, out DeploymentEnvironment deploymentEnv))
+            {
+                throw new InvalidOperationException($"Unrecognized {DeploymentEnvVar} value '{deploymentCfg}'.");
+            }
+
+            return new DseDeploymentEnvironment
+            {
+                ApplicationName = hostEnv.ApplicationName,
+                ContentRootFileProvider = hostEnv.ContentRootFileProvider,
+                ContentRootPath = hostEnv.ContentRootPath,
+                EnvironmentName = hostEnv.EnvironmentName,
+                Deployment = deploymentEnv,
+            };
+        });
 
     [ExcludeFromCodeCoverage]
-    private class DseDeploymentEnvironment : IDseDeploymentEnvironment
+    private class DseEnvironment : IDseEnvironment
     {
         public required string ApplicationName { get; set; }
         public required IFileProvider ContentRootFileProvider { get; set; }
         public required string ContentRootPath { get; set; }
         public required string EnvironmentName { get; set; }
+    }
+
+    [ExcludeFromCodeCoverage]
+    private sealed class DseDeploymentEnvironment : DseEnvironment, IDseDeploymentEnvironment
+    {
         public required DeploymentEnvironment Deployment { get; init; }
     }
 
     [ExcludeFromCodeCoverage]
-    private sealed class DseLocalEnvironment : IDseLocalEnvironment
+    private sealed class DseLocalEnvironment : DseEnvironment, IDseLocalEnvironment
     {
-        public string ApplicationName { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = null!;
-        public string ContentRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = string.Empty;
         public string Username { get; init; } = string.Empty;
         public string Password { get; init; } = string.Empty;
         public string[] Roles { get; init; } = [];

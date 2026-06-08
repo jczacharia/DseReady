@@ -1,6 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Text;
 using System.Web;
@@ -63,7 +64,7 @@ internal sealed class StubConfluenceHandler(StubConfluenceState state) : HttpMes
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        var query = HttpUtility.ParseQueryString(request.RequestUri?.Query ?? string.Empty);
+        NameValueCollection query = HttpUtility.ParseQueryString(request.RequestUri?.Query ?? string.Empty);
         int start = int.Parse(query["start"] ?? "0", CultureInfo.InvariantCulture);
         int limit = int.Parse(query["limit"] ?? "0", CultureInfo.InvariantCulture);
 
@@ -81,8 +82,8 @@ internal sealed class StubConfluenceHandler(StubConfluenceState state) : HttpMes
             await state.ReleaseTask.WaitAsync(ct).ConfigureAwait(false);
         }
 
-        int count = Math.Clamp(state.Total - start, 0, limit);
-        string results = string.Join(',', Enumerable.Range(start, count).Select(Document));
+        int count = Math.Clamp(state.Total - start, min: 0, limit);
+        string results = string.Join(separator: ',', Enumerable.Range(start, count).Select(Document));
         return Json($$"""{"results":[{{results}}],"totalSize":{{state.Total}}}""");
     }
 
@@ -94,16 +95,16 @@ internal sealed class StubConfluenceHandler(StubConfluenceState state) : HttpMes
     // A complete-enough Confluence content object: every field ConfluenceDocJsonConverter navigates, plus body
     // markup with a macro so the real ConfluenceHtmlCleaner runs over it during ingestion.
     private static string Document(int i) => $$"""
-        {
-          "id": "{{i + 1}}",
-          "type": "page",
-          "title": "Stub Page {{i + 1}}",
-          "body": { "storage": { "value": "<p>Document {{i + 1}} body.</p><ac:structured-macro ac:name=\"info\"><ac:rich-text-body><p>note {{i + 1}}</p></ac:rich-text-body></ac:structured-macro>" } },
-          "space": { "id": 100, "key": "DEV", "name": "Developers", "_links": { "webui": "/display/DEV" } },
-          "version": { "number": {{i + 1}}, "when": "2026-01-0{{(i % 9) + 1}}T00:00:00Z", "by": { "username": "author{{i}}", "userKey": "key{{i}}", "displayName": "Author {{i}}", "profilePicture": { "path": "/images/{{i}}.png" } } },
-          "history": { "createdDate": "2025-01-0{{(i % 9) + 1}}T00:00:00Z", "createdBy": { "username": "creator{{i}}", "userKey": "ckey{{i}}", "displayName": "Creator {{i}}", "profilePicture": { "path": "/images/c{{i}}.png" } } },
-          "ancestors": [ { "id": "0", "type": "page", "title": "Home", "_links": { "webui": "/display/DEV/Home" } } ],
-          "metadata": { "labels": { "results": [ { "id": "lbl{{i}}", "name": "stub", "prefix": "global" } ] } }
-        }
-        """;
+                                               {
+                                                 "id": "{{i + 1}}",
+                                                 "type": "page",
+                                                 "title": "Stub Page {{i + 1}}",
+                                                 "body": { "storage": { "value": "<p>Document {{i + 1}} body.</p><ac:structured-macro ac:name=\"info\"><ac:rich-text-body><p>note {{i + 1}}</p></ac:rich-text-body></ac:structured-macro>" } },
+                                                 "space": { "id": 100, "key": "DEV", "name": "Developers", "_links": { "webui": "/display/DEV" } },
+                                                 "version": { "number": {{i + 1}}, "when": "2026-01-0{{i % 9 + 1}}T00:00:00Z", "by": { "username": "author{{i}}", "userKey": "key{{i}}", "displayName": "Author {{i}}", "profilePicture": { "path": "/images/{{i}}.png" } } },
+                                                 "history": { "createdDate": "2025-01-0{{i % 9 + 1}}T00:00:00Z", "createdBy": { "username": "creator{{i}}", "userKey": "ckey{{i}}", "displayName": "Creator {{i}}", "profilePicture": { "path": "/images/c{{i}}.png" } } },
+                                                 "ancestors": [ { "id": "0", "type": "page", "title": "Home", "_links": { "webui": "/display/DEV/Home" } } ],
+                                                 "metadata": { "labels": { "results": [ { "id": "lbl{{i}}", "name": "stub", "prefix": "global" } ] } }
+                                               }
+                                               """;
 }

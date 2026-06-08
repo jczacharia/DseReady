@@ -4,6 +4,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 
 namespace Dse.Auth;
 
@@ -20,6 +22,7 @@ public sealed class LdapAuthOptions
 {
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; } = 636;
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(5);
     public string BindDn { get; set; } = string.Empty;
     public string BindPassword { get; set; } = string.Empty;
     public string SearchBase { get; set; } = string.Empty;
@@ -49,8 +52,7 @@ public static class LdapAuthExtensions
                 options.GroupsFilter = uid => $"(&(objectClass=user)(!(objectClass=computer))(sAMAccountName={uid}))";
             });
 
-        services.AddKeyedSingleton<LdapConnector>(LdapAuthDefaults.Ad, (sp, _) => new LdapConnector(LdapAuthDefaults.Ad, sp));
-        services.AddSingleton<LdapConnector>(static sp => sp.GetRequiredKeyedService<LdapConnector>(LdapAuthDefaults.Ad));
+        services.AddLdapDirectory(LdapAuthDefaults.Ad);
 
         return services;
     }
@@ -78,14 +80,34 @@ public static class LdapAuthExtensions
                 }
 
                 options.SearchBase = options.SearchBase.Or("o=pnc");
-                options.GroupsAttribute = options.GroupsAttribute.Or("groupMembership");
-                options.GroupsFilter = uid => $"(&(objectClass=user)(!(objectClass=computer))(sAMAccountName={uid}))";
+                options.GroupsAttribute = options.GroupsAttribute.Or("memberOf");
+                options.GroupsFilter = uid => $"(uid={uid})";
             });
 
 
-        services.AddKeyedSingleton<LdapConnector>(LdapAuthDefaults.Oud, (sp, _) => new LdapConnector(LdapAuthDefaults.Oud, sp));
-        services.AddSingleton<LdapConnector>(static sp => sp.GetRequiredKeyedService<LdapConnector>(LdapAuthDefaults.Oud));
+        services.AddLdapDirectory(LdapAuthDefaults.Oud);
 
         return services;
+    }
+
+    // One directory: a keyed connector (the authoritative instance), a plain registration so consumers that want
+    // every directory can enumerate them, and a readiness health check bound to that same keyed connector. Keyed
+    // by the options name, so AD and OUD stay a single line apart.
+    private static void AddLdapDirectory(this IServiceCollection services, string key)
+    {
+        services.AddKeyedSingleton<LdapConnector>(key, (sp, _) => new LdapConnector(key, sp));
+        services.AddSingleton<LdapConnector>(sp => sp.GetRequiredKeyedService<LdapConnector>(key));
+
+        // "Ldap:Ad" → "ldap-ad", giving a clean per-check diagnostic route (/health/ldap-ad).
+        string name = $"ldap-{key.Split(':')[^1].ToLowerInvariant()}";
+        services.AddHealthChecks()
+            .Add(new HealthCheckRegistration(
+                name,
+                sp => new LdapHealthCheck(
+                    sp.GetRequiredKeyedService<LdapConnector>(key),
+                    sp.GetRequiredService<ILogger<LdapHealthCheck>>()),
+                HealthStatus.Unhealthy,
+                ["ready", "ldap"],
+                TimeSpan.FromSeconds(8)));
     }
 }
