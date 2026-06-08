@@ -9,7 +9,8 @@ ENV SL_PROFILER_INITIALIZECOLLECTOR=1
 ENV SL_PROFILER_INITIALIZECOLLECTOR_MODE="cdAgent"
 ENV SL_PROFILER_BLOCKING_CONNECTION_STARTUP="ASYNC"
 ENV SL_FEATURES_IDENTIFYMETHODSBYFQN="true"
-ENV SL_SESSION_TOKENFILE=/sealights/sltoken.txt
+# SL_SESSION_TOKEN is injected at runtime (OpenShift env, sourced from a Secret).
+# Do NOT hardcode the token here — this file is committed to git.
 
 ARG BUILD_NUMBER
 ENV SL_GENERAL_APPNAME="dse_searchapi"
