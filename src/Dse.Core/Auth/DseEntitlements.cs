@@ -5,7 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Dse.Auth;
 
-[ExcludeFromCodeCoverage]
 public static class DseEntitlements
 {
     public const string KibanaAdminOudDn = "app-dse-kibana-admin";
