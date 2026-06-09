@@ -1,8 +1,10 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
+using Dse.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -17,131 +19,111 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 namespace Dse.Auth;
 
 [ExcludeFromCodeCoverage]
-public static class PingAuthDefaults
+public sealed class PingOptions
 {
-    public const string AuthenticationScheme = "Ping";
-}
+    public const string SchemeName = "Ping";
 
-[ExcludeFromCodeCoverage]
-internal class ConfigurePingJwtBearerOptions(
-    ILogger<ConfigurePingJwtBearerOptions> logger,
-    IDseEnvironment env,
-    IConfiguration cfg) : IConfigureNamedOptions<JwtBearerOptions>
-{
-    public void Configure(string? name, JwtBearerOptions options)
-    {
-        if (name != PingAuthDefaults.AuthenticationScheme)
-        {
-            return;
-        }
+    [Url]
+    [Required]
+    public string MetadataAddress { get; set; } = string.Empty;
 
-        const string defaultUrl = "https://wfsso-apps.pnc.com/.well-known/openid-configuration";
+    [Required]
+    public string CookieName { get; set; } = "PA.APP_DSE";
 
-        string metadataAddress = cfg["Ping:MetadataAddress"] ?? (env is IDseDeploymentEnvironment de
-            ? de.Deployment switch
-            {
-                DeploymentEnvironment.Rnd => "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration",
-                DeploymentEnvironment.Uat => "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration",
-                DeploymentEnvironment.Qa => "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration",
-                _ => defaultUrl,
-            }
-            : defaultUrl);
+    [Required]
+    public string IsMemberOfClaim { get; set; } = "isMemberOf";
 
-        options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-            metadataAddress,
-            new OpenIdConnectConfigurationRetriever(),
-            new HttpDocumentRetriever { RequireHttps = true });
+    [Required]
+    public string UidClaim { get; set; } = "uid";
 
-        options.TokenValidationParameters.ValidateIssuer = false;
-        options.TokenValidationParameters.ValidateAudience = false;
-        options.TokenValidationParameters.ValidateIssuerSigningKey = true;
-        options.TokenValidationParameters.TransformBeforeSignatureValidation = (token, _) =>
-        {
-            if (token is JsonWebToken outer
-                && outer.TryGetPayloadValue<string>("access_token", out string? inner)
-                && !string.IsNullOrEmpty(inner))
-            {
-                return new JsonWebToken(inner);
-            }
+    [Required]
+    public string AccessTokenClaim { get; set; } = "access_token";
 
-            return token;
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                if (context.HttpContext.Request.Cookies[cfg["Ping:CookieName"] ?? "PA.APP_DSE"] is { Length: > 0 } cookieJwt)
-                {
-                    context.Token = cookieJwt;
-                }
-
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = async context =>
-            {
-                if (context.Principal?.Identity is not ClaimsIdentity identity)
-                {
-                    return;
-                }
-
-
-                if (identity.FindFirst(cfg["Ping:IsMemberOfClaim"] ?? "isMemberOf")?.Value is { Length: > 0 } memberOf)
-                {
-                    foreach (string member in memberOf.Split(separator: '^',
-                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    {
-                        identity.AddClaim(new Claim(ClaimTypes.Role, member));
-                    }
-                }
-
-                if (identity.FindFirst(cfg["Ping:UidClaim"] ?? "uid")?.Value is not { Length: > 0 } uid)
-                {
-                    return;
-                }
-
-                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
-
-                foreach (LdapConnector connector in context.HttpContext.RequestServices.GetServices<LdapConnector>())
-                {
-                    if (!connector.Bound)
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        foreach (string membership in await connector.GetMembershipsAsync(uid))
-                        {
-                            identity.AddClaim(new Claim(ClaimTypes.Role, membership));
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "Failed to enrich claims from LDAP {LdapName} for user {Uid}", uid, connector.Name);
-                    }
-                }
-            },
-            OnChallenge = context =>
-            {
-                context.Response.Headers.Append("X-Auth-Challenge", context.Scheme.Name);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                context.HandleResponse();
-                return Task.CompletedTask;
-            },
-        };
-    }
-
-    public void Configure(JwtBearerOptions options) => Configure(PingAuthDefaults.AuthenticationScheme, options);
+    [Required]
+    public string ChallengeHeader { get; set; } = "X-Auth-Challenge";
 }
 
 [ExcludeFromCodeCoverage]
 public static class PingAuthOptionsExtensions
 {
-    public static AuthenticationBuilder AddPingAuthentication(this AuthenticationBuilder builder)
+    public static AuthenticationBuilder AddPingJwtBearer(this AuthenticationBuilder builder)
     {
-        builder.AddJwtBearer(PingAuthDefaults.AuthenticationScheme);
-        builder.Services.ConfigureOptions<ConfigurePingJwtBearerOptions>();
-        return builder;
+        builder.Services
+            .AddOptions<PingOptions>()
+            .BindConfiguration(PingOptions.SchemeName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        builder.Services
+            .AddOptions<JwtBearerOptions>(PingOptions.SchemeName)
+            .Configure<IOptionsMonitor<PingOptions>>((options, ping) =>
+            {
+                options.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+                    ping.CurrentValue.MetadataAddress,
+                    new OpenIdConnectConfigurationRetriever(),
+                    new HttpDocumentRetriever { RequireHttps = true });
+
+                options.TokenValidationParameters.ValidateIssuer = false;
+                options.TokenValidationParameters.ValidateAudience = false;
+                options.TokenValidationParameters.ValidateIssuerSigningKey = true;
+                options.TokenValidationParameters.TransformBeforeSignatureValidation = (token, _) =>
+                {
+                    if (token is JsonWebToken outer
+                        && outer.TryGetPayloadValue<string>(ping.CurrentValue.AccessTokenClaim, out string? inner)
+                        && !string.IsNullOrEmpty(inner))
+                    {
+                        return new JsonWebToken(inner);
+                    }
+
+                    return token;
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.HttpContext.Request.Cookies[ping.CurrentValue.CookieName] is { Length: > 0 } cookieJwt)
+                        {
+                            context.Token = cookieJwt;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        if (context.Principal?.Identity is not ClaimsIdentity identity)
+                        {
+                            return;
+                        }
+
+                        if (identity.FindFirst(ping.CurrentValue.UidClaim)?.Value is { Length: > 0 } uid)
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, uid));
+                            foreach (LdapConnector connector in context.HttpContext.RequestServices.GetServices<LdapConnector>())
+                            {
+                                await connector.AddMembershipsClaims(identity, uid);
+                            }
+                        }
+
+
+                        if (identity.FindFirst(ping.CurrentValue.IsMemberOfClaim)?.Value is { Length: > 0 } memberOf)
+                        {
+                            foreach (string member in memberOf.Split(separator: '^',
+                                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                identity.AddClaim(new Claim(ClaimTypes.Role, member));
+                            }
+                        }
+                    },
+                    OnChallenge = context =>
+                    {
+                        context.Response.Headers.Append(ping.CurrentValue.ChallengeHeader, context.Scheme.Name);
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.HandleResponse();
+                        return Task.CompletedTask;
+                    },
+                };
+            });
+        return builder.AddJwtBearer(PingOptions.SchemeName);
     }
 }

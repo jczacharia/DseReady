@@ -30,9 +30,7 @@ public abstract class Entity<TKey> : IEntity<TKey> where TKey : notnull
     public virtual DateTimeOffset CreatedAt { get; set; }
     public virtual DateTimeOffset? UpdatedAt { get; set; }
     IReadOnlyList<IDomainEvent> IEntity.Events => _events.OfType<IDomainEvent>().ToList();
-
-    public void Publish(IDomainEvent e) =>
-        _events.Add(e);
+    public void Publish(IDomainEvent e) => _events.Add(e);
 }
 
 public sealed record EntityResponse<TKey>(TKey Id, Uri Location) where TKey : notnull;

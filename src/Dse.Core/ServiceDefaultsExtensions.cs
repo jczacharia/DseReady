@@ -31,12 +31,7 @@ public static class ServiceDefaultsExtensions
 {
     public static void AddServiceDefaults(this IHostApplicationBuilder builder)
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            builder.Configuration.AddUserSecrets("dse");
-        }
-
-        builder.Services.AddDseEnvironment();
+        builder.AddDseEnvironment();
         builder.Services.AddHostedService<SourcesValidator>();
 
         builder.Services.AddResourceSetupOnStartup();
@@ -46,11 +41,40 @@ public static class ServiceDefaultsExtensions
         builder.Services.AddSingleton<DataMigrator>();
         builder.Services.AddHostedService<DataMigrator>(static sp => sp.GetRequiredService<DataMigrator>());
 
-        builder.Services.AddElastic();
-        builder.AddIngestion();
+        builder.Services
+            .AddLdapAuth("Ad")
+            .PostDseConfigure(static (options, dse) =>
+            {
+                if (dse.LocalCredentials() is { } cred)
+                {
+                    options.BindDn = options.BindDn.Or($"{cred.Username}@{options.Host}");
+                    options.BindPassword = options.BindPassword.Or(cred.Password);
+                }
+            });
 
-        builder.Services.AddLdapAd();
-        builder.Services.AddLdapOud();
+        builder.Services
+            .AddLdapAuth("Oud")
+            .PostDseConfigure(static (options, dse) =>
+            {
+                if (dse.LocalCredentials() is { } cred)
+                {
+                    options.BindDn = options.BindDn.Or($"cn={cred.Username},ou=Employees,ou=People,o=pnc");
+                    options.BindPassword = options.BindPassword.Or(cred.Password);
+                }
+            });
+
+        builder.Services
+            .AddElastic()
+            .PostDseConfigure(static (options, dse) =>
+            {
+                if (dse.LocalCredentials() is { } cred)
+                {
+                    options.Username = options.Username.Or(cred.Username);
+                    options.Password = options.Password.Or(cred.Password);
+                }
+            });
+
+        builder.AddIngestion();
 
         builder.Services.AddProblemDetails(static s => s.ApplyCoreCustomization());
         builder.Services.ConfigureHttpClientDefaults(static o => o.RemoveAllLoggers());
@@ -79,12 +103,6 @@ public static class ServiceDefaultsExtensions
         }
     }
 
-    // The generic host auto-adds a Windows Event Log provider whenever it runs on Windows. This service is a Linux
-    // container that logs to the console and OpenTelemetry on every platform — it has no Event Log to write to.
-    // Worse, the runtime project pins a linux-x64 RuntimeIdentifier, so on a dev Windows box the provider binds to
-    // the non-Windows System.Diagnostics.EventLog stub and throws PlatformNotSupportedException as the host eagerly
-    // builds its loggers. Drop it so startup is identical on every OS. (Provider construction is eager — a log-level
-    // filter can't prevent it; the descriptor has to go.)
     private static void RemoveWindowsEventLogProvider(this IHostApplicationBuilder builder)
     {
         const string eventLogProvider = "Microsoft.Extensions.Logging.EventLog.EventLogLoggerProvider";

@@ -2,10 +2,14 @@
 
 
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Claims;
 using System.Text;
 using Dse.Shared;
+using JasperFx.Core;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Novell.Directory.Ldap;
 
@@ -15,7 +19,11 @@ namespace Dse.Auth;
 public sealed class LdapConnector(string name, IServiceProvider services) : IDisposable
 {
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();
-    private readonly IDseEnvironment _env = services.GetRequiredService<IDseEnvironment>();
+    private readonly IHostEnvironment _env = services.GetRequiredService<IHostEnvironment>();
+
+    private readonly ILogger _logger =
+        services.GetRequiredService<ILoggerFactory>().CreateLogger($"{name.Capitalize()}{nameof(LdapConnector)}");
+
     private readonly IOptionsMonitor<LdapAuthOptions> _monitor = services.GetRequiredService<IOptionsMonitor<LdapAuthOptions>>();
     private readonly SemaphoreSlim _semaphore = new(initialCount: 1, maxCount: 1);
     private LdapConnection? _connection;
@@ -39,7 +47,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
             {
                 LdapConnectionOptions ldapOpts = new LdapConnectionOptions().UseSsl();
 
-                if (_env is IDseLocalEnvironment)
+                if (!_env.IsProduction())
                 {
                     ldapOpts = ldapOpts.ConfigureRemoteCertificateValidationCallback((_, _, _, _) => true);
                 }
@@ -67,7 +75,22 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
         }
     }
 
-    public ValueTask<IReadOnlySet<string>> GetMembershipsAsync(string uid) =>
+    public async ValueTask AddMembershipsClaims(ClaimsIdentity identity, string uid)
+    {
+        try
+        {
+            foreach (string membership in await GetMembershipsAsync(uid))
+            {
+                identity.AddClaim(new Claim(ClaimTypes.Role, membership));
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to enrich claims from LDAP {LdapName} for user {Uid}", uid, Name);
+        }
+    }
+
+    private ValueTask<IReadOnlySet<string>> GetMembershipsAsync(string uid) =>
         new(_cache.GetOrCreateAsync($"{name}:memberships:{uid}", _ => SearchAdAsync(uid), new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
@@ -77,7 +100,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     {
         LdapConnection conn = await GetConnectionAsync().ConfigureAwait(false);
 
-        string? groupFilter = Options.GroupsFilter?.Invoke(EscapeFilter(uid));
+        string? groupFilter = Options.GroupsFilter.Replace("{0}", EscapeFilter(uid));
 
         ILdapSearchResults results = await conn.SearchAsync(
                 Options.SearchBase,

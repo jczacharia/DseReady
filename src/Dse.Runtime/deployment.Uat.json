@@ -1,0 +1,16 @@
+{
+    "Dse": {
+        "Environment": "Uat"
+    },
+    "OpenApi": {
+        "ExternalBaseUrl": "https://search-uat.pncint.net/adv/api"
+    },
+    "Ping": {
+        "MetadataAddress": "https://wfsso-apps-uat.pnc.com/.well-known/openid-configuration"
+    },
+    "Ldap": {
+        "Oud": {
+            "Host": "mdsemp-uat.pncint.net"
+        }
+    }
+}

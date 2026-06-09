@@ -21,8 +21,8 @@ public sealed class LdapOptionsTests(ITestOutputHelper toh, TestFixture fixture)
     [Fact]
     public void Each_named_instance_binds_its_own_section()
     {
-        LdapAuthOptions ad = Monitor.Get(LdapAuthDefaults.Ad);
-        LdapAuthOptions oud = Monitor.Get(LdapAuthDefaults.Oud);
+        LdapAuthOptions ad = Monitor.Get("Ad");
+        LdapAuthOptions oud = Monitor.Get("Oud");
 
         ad.Host.Should().Be("ad.dse.test");
         ad.SearchBase.Should().Be("DC=ad,DC=dse,DC=test");
@@ -41,9 +41,9 @@ public sealed class LdapOptionsTests(ITestOutputHelper toh, TestFixture fixture)
     {
         // A field absent from config (Port) falls through to the section's PostConfigure default, proving the
         // post-configure step is keyed to the same name — not the default instance.
-        Monitor.Get(LdapAuthDefaults.Ad).Port.Should().Be(636);
-        Monitor.Get(LdapAuthDefaults.Ad).GroupsFilter.Should().NotBeNull();
-        Monitor.Get(LdapAuthDefaults.Oud).GroupsFilter.Should().NotBeNull();
+        Monitor.Get("Ad").Port.Should().Be(636);
+        Monitor.Get("Ad").GroupsFilter.Should().NotBeNull();
+        Monitor.Get("Oud").GroupsFilter.Should().NotBeNull();
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class LdapOptionsTests(ITestOutputHelper toh, TestFixture fixture)
 
         connectors.Select(c => c.Name)
             .Should()
-            .BeEquivalentTo(LdapAuthDefaults.Ad, LdapAuthDefaults.Oud);
+            .BeEquivalentTo("Ad", "Oud");
 
         // Each connector reads Monitor.Get(its-own-Name); none of them should see an empty Host (the bug).
         foreach (LdapConnector connector in connectors)

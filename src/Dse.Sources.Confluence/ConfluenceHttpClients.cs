@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using Dse.Shared;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Timeout;
 
@@ -29,7 +30,8 @@ internal static class ConfluenceHttpClients
     {
         services
             .AddHttpClient(BackfillClient, ConfigureClient)
-            .ConfigurePrimaryHttpMessageHandler(sp => CreatePrimaryHandler(sp.GetRequiredService<ConfluenceOptions>()))
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+                CreatePrimaryHandler(sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value))
             .AddResilienceHandler("confluence-backfill", static pipeline =>
             {
                 pipeline.AddTimeout(TimeSpan.FromMinutes(2));
@@ -76,7 +78,8 @@ internal static class ConfluenceHttpClients
 
         services
             .AddHttpClient(ReadThroughClient, ConfigureClient)
-            .ConfigurePrimaryHttpMessageHandler(sp => CreatePrimaryHandler(sp.GetRequiredService<ConfluenceOptions>()))
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+                CreatePrimaryHandler(sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value))
             // Interactive reads: one tight overall budget, no retries — fail fast for the browser/UI. A timeout
             // surfaces as TimeoutRejectedException, which the endpoints map to 504.
             .AddResilienceHandler("confluence-readthrough", static pipeline => pipeline.AddTimeout(TimeSpan.FromSeconds(20)));
@@ -84,7 +87,7 @@ internal static class ConfluenceHttpClients
 
     private static void ConfigureClient(IServiceProvider sp, HttpClient http)
     {
-        var opts = sp.GetRequiredService<ConfluenceOptions>();
+        var opts = sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value;
         http.BaseAddress = new Uri(opts.BaseAddress);
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         http.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));

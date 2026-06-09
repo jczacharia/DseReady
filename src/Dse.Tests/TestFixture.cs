@@ -19,6 +19,7 @@ using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Wolverine;
+using Wolverine.Persistence.Durability;
 
 [assembly: CaptureConsole(CaptureError = true, CaptureOut = true)]
 [assembly: AssemblyFixture(typeof(TestFixture))]
@@ -35,7 +36,7 @@ public sealed class TestFixture : IAsyncLifetime
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
 
-    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
+    public string DbFilename { get; } = $"{Guid.NewGuid().ToString("N")[..10]}.db";
 
     private IAlbaHost? _host;
 
@@ -47,7 +48,7 @@ public sealed class TestFixture : IAsyncLifetime
     {
         ConfigurationBuilder config = new();
 
-        if (IDseEnvironment.IsRelease)
+        if (DseOptions.IsCi())
         {
             string esHome = await EnsureEsDownloadedAsync();
             await StartAsync(esHome);
@@ -85,9 +86,6 @@ public sealed class TestFixture : IAsyncLifetime
                 services
                     .AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
-
-                // CI has Elasticsearch but no Confluence: stub it at the HttpMessageHandler seam so the real
-                // ingest pipeline runs against deterministic, instantly-available data.
                 services.AddSingleton<StubConfluenceState>();
                 foreach (string client in (string[])["confluence", "confluence-readthrough"])
                 {
@@ -99,11 +97,10 @@ public sealed class TestFixture : IAsyncLifetime
             });
         }, new TestConfigurationExtension(builder =>
         {
-            builder.AddUserSecrets("dse");
             builder.AddConfiguration(config.Build());
             builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:sqlite"] = $"Data Source={_dbFilename}",
+                ["ConnectionStrings:sqlite"] = $"Data Source={DbFilename}",
                 ["Ldap:Ad:Host"] = "ad.dse.test",
                 ["Ldap:Ad:SearchBase"] = "DC=ad,DC=dse,DC=test",
                 ["Ldap:Ad:GroupsAttribute"] = "memberOf",
@@ -117,8 +114,6 @@ public sealed class TestFixture : IAsyncLifetime
         {
             context.Request.EnableBuffering();
         });
-
-        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
     }
 
     public async ValueTask DisposeAsync()
@@ -129,9 +124,9 @@ public sealed class TestFixture : IAsyncLifetime
         // Clear the SQLite connection pool so the file handle is released,
         // then delete the per-run database file.
         SqliteConnection.ClearAllPools();
-        if (!string.IsNullOrEmpty(_dbFilename) && File.Exists(_dbFilename))
+        if (!string.IsNullOrEmpty(DbFilename) && File.Exists(DbFilename))
         {
-            File.Delete(_dbFilename);
+            File.Delete(DbFilename);
         }
 
         if (_process is null)
@@ -158,19 +153,19 @@ public sealed class TestFixture : IAsyncLifetime
         }
     }
 
-    public async Task TearDownAsync(IServiceProvider services)
+    public async Task ResetAsync()
     {
-        // Schema + Source seed persist (owned by migrations); only the ingest data and Wolverine envelope state
-        // are reset between tests.
-        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
-        await Host.ResetResourceState(Ct);
-        services.GetService<StubConfluenceState>()?.Reset();
+        await DataContextRespawner.RespawnAsync($"Data Source={DbFilename}", Ct);
+        Host.Services.GetService<StubConfluenceState>()?.Reset();
+        await Host.SetupResources();
+        await Host.TeardownResources();
+        await Host.ResetResourceState();
+        var store = Host.Services.GetRequiredService<IMessageStore>();
+        await store.Admin.RebuildAsync();
+        await store.Admin.ClearAllAsync();
 
-        // No deleting 'test-*' wildcard as in local development (not CI/Release) as ES is a shared resource.
-        // We don't add it add all so behavior is the same.
-
-        var esClient = services.GetRequiredService<ElasticsearchClient>();
-        foreach (ElasticsearchTypeContext typeContext in services.GetServices<ElasticsearchTypeContext>())
+        var esClient = Host.Services.GetRequiredService<ElasticsearchClient>();
+        foreach (ElasticsearchTypeContext typeContext in Host.Services.GetServices<ElasticsearchTypeContext>())
         {
             string index = typeContext.ResolveIndexFormat();
             Assert.StartsWith("test-", index);

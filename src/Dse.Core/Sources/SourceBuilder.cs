@@ -7,6 +7,7 @@ using Elastic.Ingest.Elasticsearch.Strategies;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 namespace Dse.Sources;
 
@@ -23,7 +24,7 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
         Services.AddKeyedSingleton(module.SourceKey, module);
         Services.AddKeyedSingleton<ElasticsearchTypeContext>(module.SourceKey, (sp, _) =>
         {
-            var env = sp.GetRequiredService<IDseEnvironment>();
+            var env = sp.GetRequiredService<IHostEnvironment>();
             ElasticsearchTypeContext typeContext = module.GetTypeContext(env);
             string aliasFormat = typeContext.ResolveAliasFormat();
 
@@ -54,9 +55,6 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
         Services.AddScoped<IIngest<TDoc>, TIngest>();
         Services.AddKeyedScoped<IIngestRunner, IngestRunner<TDoc>>(SourceKey);
     }
-
-    public void AddIngestStrategy<TIngest>() where TIngest : class, IIngestStrategy<TDoc> =>
-        Services.AddSingleton<IIngestStrategy<TDoc>, TIngest>();
 
     public void AddHealthCheck<TCheck>(HealthStatus status = HealthStatus.Degraded, TimeSpan? timeout = null)
         where TCheck : class, IHealthCheck

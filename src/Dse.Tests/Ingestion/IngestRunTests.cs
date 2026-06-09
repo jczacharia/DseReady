@@ -9,6 +9,7 @@ using Dse.Ingestion.Endpoints;
 using Dse.Sources;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Wolverine.Tracking;
 
 namespace Dse.Tests.Ingestion;
 
@@ -22,7 +23,6 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
 {
     private static readonly string[] s_admin = [DseEntitlements.KibanaAdminOudDn];
     private static readonly string[] s_readonly = [DseEntitlements.KibanaReadonlyOudDn];
-    private static readonly TimeSpan s_ingestTimeout = TimeSpan.FromSeconds(15);
 
     private SourceKey Confluence => Sources.Single(m => m.SourceKey.ToString() == "confluence").SourceKey;
     private StubConfluenceState Stub => Services.GetRequiredService<StubConfluenceState>();
@@ -32,13 +32,13 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     {
         SourceKey key = Confluence;
 
-        await Http(s =>
+        await Problem(s =>
         {
             s.Post.Url($"/sources/{key}/ingest?dryRun=false");
             s.StatusCodeShouldBe(HttpStatusCode.Unauthorized);
         });
 
-        await Http(s =>
+        await Problem(s =>
         {
             s.Post.Url($"/sources/{key}/ingest?dryRun=false");
             s.WithUser(s_readonly);
@@ -60,14 +60,14 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
         run.ActiveSourceKey.Should().BeNull("a terminal run releases its single-flight slot");
 
         // The status endpoint must serialize cleanly — the phase→run back-reference must not cycle.
-        IScenarioResult statusResult = await Http(s =>
+        (_, IScenarioResult result) = await Scenario(s =>
         {
             s.Get.Url($"/sources/{key}/ingest/{runId}");
             s.WithUser(s_readonly);
             s.StatusCodeShouldBe(HttpStatusCode.OK);
         });
 
-        var status = await statusResult.ReadAsJsonAsync<IngestRunStatus>();
+        var status = await result.ReadAsJsonAsync<IngestRunStatus>();
         status.Should().NotBeNull();
         status!.Id.Should().Be(runId);
         status.Phases.Should().Contain(p => p.Checkpoint == IngestCheckpoint.Succeeded);
@@ -100,7 +100,7 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
         SourceKey key = Confluence;
         await SeedActiveRunAsync(key);
 
-        await Http(s =>
+        await Problem(s =>
         {
             s.Post.Url($"/sources/{key}/ingest");
             s.WithUser(s_admin);
@@ -111,47 +111,50 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     [Fact]
     public async Task Cancel_finalizes_an_in_flight_run_and_frees_the_source()
     {
-        SourceKey key = Confluence;
-        Stub.Total = 5;
-        Stub.BeginGate(); // park the document-fetch so the run is provably mid-ingest when we cancel.
-
-        // A dry run still fetches its one clamped document, so it parks on the same gate. Start the durable
-        // ingestion but don't await it yet — the tracked session settles only once the background handler has
-        // unwound, which is exactly what we want to wait on AFTER cancelling.
-        Task<IScenarioResult> ingest = TrackedHttp(s =>
+        await Host.ExecuteAndWaitAsync(async Task (_) =>
         {
-            s.Post.Url($"/sources/{key}/ingest?dryRun=true");
-            s.WithUser(s_admin);
-            s.StatusCodeShouldBe(HttpStatusCode.Accepted);
-        }, s_ingestTimeout);
+            SourceKey key = Confluence;
+            Stub.Total = 5;
+            Stub.BeginGate(); // park the document-fetch so the run is provably mid-ingest when we cancel.
 
-        await Stub.PageFetchEntered.WaitAsync(Ct); // runner is now blocked inside the ingest phase.
-        Guid runId = await ActiveRunIdAsync(key);
+            // A dry run still fetches its one clamped document, so it parks on the same gate. Start the durable
+            // ingestion but don't await it yet — the tracked session settles only once the background handler has
+            // unwound, which is exactly what we want to wait on AFTER cancelling.
+            var ingest = Host.Scenario(s =>
+            {
+                s.Post.Url($"/sources/{key}/ingest?dryRun=true");
+                s.WithUser(s_admin);
+                s.StatusCodeShouldBe(HttpStatusCode.Accepted);
+            });
 
-        await Http(s =>
-        {
-            s.Post.Url($"/sources/{key}/ingest/{runId}/cancel");
-            s.WithUser(s_admin);
-            s.StatusCodeShouldBe(HttpStatusCode.Accepted);
+            await Stub.PageFetchEntered.WaitAsync(Ct); // runner is now blocked inside the ingest phase.
+            Guid runId = await ActiveRunIdAsync(key);
+
+            await Host.Scenario(s =>
+            {
+                s.Post.Url($"/sources/{key}/ingest/{runId}/cancel");
+                s.WithUser(s_admin);
+                s.StatusCodeShouldBe(HttpStatusCode.Accepted);
+            });
+
+            Stub.Release(); // belt-and-suspenders; cancellation already trips the parked fetch.
+            await ingest; // the handler defers to the recorded terminal and completes; teardown is now safe.
+
+            IngestRun run = await ReadRunAsync(runId);
+            run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Canceled);
+            run.IsTerminal.Should().BeTrue();
+            run.ActiveSourceKey.Should().BeNull();
         });
-
-        Stub.Release(); // belt-and-suspenders; cancellation already trips the parked fetch.
-        await ingest; // the handler defers to the recorded terminal and completes; teardown is now safe.
-
-        IngestRun run = await ReadRunAsync(runId);
-        run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Canceled);
-        run.IsTerminal.Should().BeTrue();
-        run.ActiveSourceKey.Should().BeNull();
     }
 
     private async Task<Guid> StartAndAwaitAsync(SourceKey key, bool dryRun, string[] roles)
     {
-        IScenarioResult result = await TrackedHttp(s =>
+        (_, IScenarioResult result) = await Scenario(s =>
         {
             s.Post.Url($"/sources/{key}/ingest?dryRun={(dryRun ? "true" : "false")}");
             s.WithUser(roles);
             s.StatusCodeShouldBe(HttpStatusCode.Accepted);
-        }, s_ingestTimeout);
+        });
 
         var accepted = await result.ReadAsJsonAsync<EntityResponse<Guid>>();
         accepted.Should().NotBeNull();
@@ -187,7 +190,7 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
 
     private async Task<IngestionOverview> OverviewAsync()
     {
-        IScenarioResult result = await Http(s =>
+        (_, IScenarioResult result) = await Scenario(s =>
         {
             s.Get.Url("/ingestion");
             s.WithUser(s_readonly);
@@ -196,6 +199,6 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
 
         var overview = await result.ReadAsJsonAsync<IngestionOverview>();
         overview.Should().NotBeNull();
-        return overview!;
+        return overview;
     }
 }

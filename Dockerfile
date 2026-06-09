@@ -16,12 +16,21 @@ ARG BUILD_NUMBER
 ENV SL_GENERAL_APPNAME="dse_searchapi"
 ENV SL_GENERAL_BRANCHNAME="main"
 ENV SL_GENERAL_BUILDNAME=$BUILD_NUMBER
+# TODO: replace "my_lab" with the real lab ID from the SeaLights dashboard (or drop this line)
 ENV SL_LABID="my_lab"
 ENV SL_SCAN_BINDIR="/app"
 ENV SL_SCAN_INCLUDENAMESPACES_0="Dse.*"
-ENV SL_SCAN_INCLUDEASSEMBLIES="*Dse"
+ENV SL_SCAN_INCLUDEASSEMBLIES="Dse.*"
 
 USER root
+
+# Install the SeaLights .NET Core agent (glibc/RHEL 8 build) into /sealights.
+# Provides libSL.DotNet.ProfilerLib.Linux.so referenced by the CORECLR_* paths above.
+RUN mkdir -p /sealights/logs && \
+    curl -fsSL -o /tmp/sl-agent.tar.gz \
+      https://agents.sealights.co/dotnetcore/latest/sealights-dotnet-agent-linux-self-contained.tar.gz && \
+    tar -xzf /tmp/sl-agent.tar.gz --directory /sealights && \
+    rm /tmp/sl-agent.tar.gz
 
 # Higher-level port mapped to port 80/443 in OpenShift
 EXPOSE 8080
@@ -39,8 +48,8 @@ COPY uid_entrypoint .
 COPY app .
 
 RUN chmod -R u+x /app && \
-    chgrp -R 0 /app && \
-    chmod -R g=u /app /etc/passwd
+    chgrp -R 0 /app /sealights && \
+    chmod -R g=u /app /sealights /etc/passwd
 
 USER 10001
 

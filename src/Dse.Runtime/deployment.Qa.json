@@ -1,0 +1,16 @@
+{
+    "Dse": {
+        "Environment": "Qa"
+    },
+    "OpenApi": {
+        "ExternalBaseUrl": "https://search-qa.pncint.net/adv/api"
+    },
+    "Ping": {
+        "MetadataAddress": "https://wfsso-apps-qa.pnc.com/.well-known/openid-configuration"
+    },
+    "Ldap": {
+        "Oud": {
+            "Host": "mdsemp-qa.pncint.net"
+        }
+    }
+}

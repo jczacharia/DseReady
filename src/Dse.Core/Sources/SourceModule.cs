@@ -5,6 +5,7 @@ using System.Reflection;
 using Elastic.Mapping;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Dse.Sources;
 
@@ -14,7 +15,7 @@ public abstract class SourceModule
 
     public Assembly Assembly => GetType().Assembly;
     public SourceKey SourceKey { get; }
-    public abstract ElasticsearchTypeContext GetTypeContext(IDseEnvironment env);
+    public abstract ElasticsearchTypeContext GetTypeContext(IHostEnvironment env);
     public abstract void Register(IServiceCollection services);
     public abstract void Configure(IEndpointRouteBuilder app);
 }
@@ -50,15 +51,15 @@ public static class SourceModuleExtensions
     public static SourceKey GetRequiredSourceKey(this Type type) => type.GetRequiredSourceModule().SourceKey;
     public static SourceKey GetRequiredSourceKey(this object obj) => obj.GetType().GetRequiredSourceKey();
 
-    public static ElasticsearchTypeContext? GetTypeContext(this Type type, IDseEnvironment env) =>
-        type.GetSourceModule()?.GetTypeContext(env);
+    public static ElasticsearchTypeContext? GetTypeContext(this Type type, IServiceProvider sp) =>
+        type.GetSourceModule()?.GetTypeContext(sp);
 
-    public static ElasticsearchTypeContext? GetTypeContext(this object obj, IDseEnvironment env) =>
-        obj.GetType().GetTypeContext(env);
+    public static ElasticsearchTypeContext? GetTypeContext(this object obj, IServiceProvider sp) =>
+        obj.GetType().GetTypeContext(sp);
 
-    public static ElasticsearchTypeContext GetRequiredTypeContext(this Type type, IDseEnvironment env) =>
-        type.GetRequiredSourceModule().GetTypeContext(env);
+    public static ElasticsearchTypeContext GetRequiredTypeContext(this Type type, IServiceProvider sp) =>
+        type.GetRequiredSourceModule().GetTypeContext(sp.GetRequiredService<IHostEnvironment>());
 
-    public static ElasticsearchTypeContext GetRequiredTypeContext(this object obj, IDseEnvironment env) =>
-        obj.GetType().GetRequiredTypeContext(env);
+    public static ElasticsearchTypeContext GetRequiredTypeContext(this object obj, IServiceProvider sp) =>
+        obj.GetType().GetRequiredTypeContext(sp);
 }

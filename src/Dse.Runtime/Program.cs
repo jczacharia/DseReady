@@ -29,9 +29,6 @@ internal sealed class Program
         catch (Exception ex)
         {
             // OpenShift/Helm last-resort visibility
-            // ValidateOnBuild and other startup failures throw
-            // before the logging pipeline has a chance to flush. Write straight to stderr
-            // so OpenShift `oc logs` shows the real cause instead of a silent exit.
             await Console.Error.WriteLineAsync($"FATAL STARTUP: {ex}").ConfigureAwait(false);
             await Console.Error.FlushAsync().ConfigureAwait(false);
             await Console.Out.FlushAsync().ConfigureAwait(false);
@@ -62,18 +59,14 @@ internal sealed class Program
                     Description = "Enterprise Search",
                 });
 
-                // MapHealthChecks endpoints have no MethodInfo, so the ApiExplorer can't see them — publish them.
                 options.DocumentFilter<HealthCheckDocumentFilter>();
             })
             .AddThinktectureOpenApiFilters();
 
-        if (builder.Environment.EnvironmentName != "Test")
-        {
-            builder.Services
-                .AddAuthentication(builder.Environment.IsDevelopment() ? "DevAuth" : PingAuthDefaults.AuthenticationScheme)
-                .AddScheme<AuthenticationSchemeOptions, DevAuthHandler>("DevAuth", configureOptions: null)
-                .AddPingAuthentication();
-        }
+        builder.Services
+            .AddAuthentication()
+            .AddPingJwtBearer()
+            .AddLocalAuthentication();
 
         builder.Services
             .AddAuthorizationBuilder()
@@ -111,17 +104,7 @@ internal sealed class Program
 
         // Pinned servers URL override (env OpenApi__ExternalBaseUrl) — safety net if apache's
         // X-Forwarded-Prefix isn't set yet.
-        string? configuredExternalBase =
-            app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/') ??
-            (app.Services.GetRequiredService<IDseEnvironment>() is IDseDeploymentEnvironment de
-                ? de.Deployment switch
-                {
-                    DeploymentEnvironment.Rnd => "https://search-rnd.pncint.net/adv/api",
-                    DeploymentEnvironment.Uat => "https://search-uat.pncint.net/adv/api",
-                    DeploymentEnvironment.Qa => "https://search-qa.pncint.net/adv/api",
-                    _ => "https://search.pncint.net/adv/api",
-                }
-                : null);
+        string? configuredExternalBase = app.Configuration["OpenApi:ExternalBaseUrl"]?.TrimEnd('/');
 
         app.UseSwagger(o =>
         {

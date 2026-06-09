@@ -94,17 +94,18 @@ internal sealed class StubConfluenceHandler(StubConfluenceState state) : HttpMes
 
     // A complete-enough Confluence content object: every field ConfluenceDocJsonConverter navigates, plus body
     // markup with a macro so the real ConfluenceHtmlCleaner runs over it during ingestion.
-    private static string Document(int i) => $$"""
-                                               {
-                                                 "id": "{{i + 1}}",
-                                                 "type": "page",
-                                                 "title": "Stub Page {{i + 1}}",
-                                                 "body": { "storage": { "value": "<p>Document {{i + 1}} body.</p><ac:structured-macro ac:name=\"info\"><ac:rich-text-body><p>note {{i + 1}}</p></ac:rich-text-body></ac:structured-macro>" } },
-                                                 "space": { "id": 100, "key": "DEV", "name": "Developers", "_links": { "webui": "/display/DEV" } },
-                                                 "version": { "number": {{i + 1}}, "when": "2026-01-0{{i % 9 + 1}}T00:00:00Z", "by": { "username": "author{{i}}", "userKey": "key{{i}}", "displayName": "Author {{i}}", "profilePicture": { "path": "/images/{{i}}.png" } } },
-                                                 "history": { "createdDate": "2025-01-0{{i % 9 + 1}}T00:00:00Z", "createdBy": { "username": "creator{{i}}", "userKey": "ckey{{i}}", "displayName": "Creator {{i}}", "profilePicture": { "path": "/images/c{{i}}.png" } } },
-                                                 "ancestors": [ { "id": "0", "type": "page", "title": "Home", "_links": { "webui": "/display/DEV/Home" } } ],
-                                                 "metadata": { "labels": { "results": [ { "id": "lbl{{i}}", "name": "stub", "prefix": "global" } ] } }
-                                               }
-                                               """;
+    private static string Document(int i) =>
+        $$"""
+          {
+            "id": "{{i + 1}}",
+            "type": "page",
+            "title": "Stub Page {{i + 1}}",
+            "body": { "storage": { "value": "<p>Document {{i + 1}} body.</p><ac:structured-macro ac:name=\"info\"><ac:rich-text-body><p>note {{i + 1}}</p></ac:rich-text-body></ac:structured-macro>" } },
+            "space": { "id": 100, "key": "DEV", "name": "Developers", "_links": { "webui": "/display/DEV" } },
+            "version": { "number": {{i + 1}}, "when": "2026-01-0{{i % 9 + 1}}T00:00:00Z", "by": { "username": "author{{i}}", "userKey": "key{{i}}", "displayName": "Author {{i}}", "profilePicture": { "path": "/images/{{i}}.png" } } },
+            "history": { "createdDate": "2025-01-0{{i % 9 + 1}}T00:00:00Z", "createdBy": { "username": "creator{{i}}", "userKey": "ckey{{i}}", "displayName": "Creator {{i}}", "profilePicture": { "path": "/images/c{{i}}.png" } } },
+            "ancestors": [ { "id": "0", "type": "page", "title": "Home", "_links": { "webui": "/display/DEV/Home" } } ],
+            "metadata": { "labels": { "results": [ { "id": "lbl{{i}}", "name": "stub", "prefix": "global" } ] } }
+          }
+          """;
 }

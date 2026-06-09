@@ -1,0 +1,16 @@
+{
+    "Dse": {
+        "Environment": "Rnd"
+    },
+    "OpenApi": {
+        "ExternalBaseUrl": "https://search-rnd.pncint.net/adv/api"
+    },
+    "Ping": {
+        "MetadataAddress": "https://wfsso-apps-rnd.pnc.com/.well-known/openid-configuration"
+    },
+    "Ldap": {
+        "Oud": {
+            "Host": "mdsemp-rnd.pncint.net"
+        }
+    }
+}
