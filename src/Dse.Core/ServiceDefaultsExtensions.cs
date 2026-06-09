@@ -130,7 +130,7 @@ public static class ServiceDefaultsExtensions
                 }
             });
 
-        builder.AddIngestion();
+        builder.Services.AddSingleton<IIngestRunControl, IngestRunControl>();
 
         builder.Services.AddProblemDetails(static s => s.ApplyCoreCustomization());
         builder.Services.ConfigureHttpClientDefaults(static o => o.RemoveAllLoggers());
