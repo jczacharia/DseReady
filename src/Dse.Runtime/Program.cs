@@ -97,9 +97,6 @@ internal sealed class Program
             app.UseHsts();
         }
 
-        // Skip HTTPS redirect in-container: OpenShift Routes do edge TLS termination,
-        // so the pod listens plain HTTP on 8080. A redirect here would 307 every probe.
-
         app.UseStaticFiles();
 
         // Pinned servers URL override (env OpenApi__ExternalBaseUrl) — safety net if apache's

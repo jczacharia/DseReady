@@ -59,7 +59,7 @@ public sealed class DseEnvironmentValidator : AbstractValidator<DseOptions>
                                 DseEnvironmentName.Uat or
                                 DseEnvironmentName.Qa or
                                 DseEnvironmentName.Prod)
-                .WithMessage("In Production, Value must be one of the following: Dev, Rnd, Uat, Qa, Prod.");
+                .WithMessage("In Production, Value must be one of the following: Rnd, Uat, Qa, Prod.");
         }
         else if (env.IsDevelopment())
         {
@@ -72,12 +72,12 @@ public sealed class DseEnvironmentValidator : AbstractValidator<DseOptions>
     }
 }
 
-public static class DseEnvironmentExtensions
+public static class DseOptionsExtensions
 {
     public static bool IsTest(this IHostEnvironment env) => env.IsEnvironment("Test");
     public static bool IsLocal(this IHostEnvironment env) => env.IsDevelopment() || env.IsTest() && !DseOptions.IsCi();
 
-    public static void AddDseEnvironment(this IHostApplicationBuilder builder)
+    public static void AddDse(this IHostApplicationBuilder builder)
     {
         if (builder.Environment.IsLocal())
         {
@@ -87,8 +87,8 @@ public static class DseEnvironmentExtensions
 
         if (builder.Environment.IsProduction() && builder.Configuration["DEPLOYMENT_ENVIRONMENT"] is { } deploymentEnv)
         {
-            builder.Configuration.AddJsonFile($"deployment.{deploymentEnv.Trim().Pascalize()}.json",
-                optional: true,
+            builder.Configuration.AddJsonFile($"deployment.{deploymentEnv.Trim().ToUpperInvariant()}.json",
+                optional: false,
                 reloadOnChange: false);
         }
 

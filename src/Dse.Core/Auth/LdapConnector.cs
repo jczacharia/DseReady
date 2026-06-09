@@ -55,7 +55,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
                 _connection = new LdapConnection(ldapOpts);
             }
 
-            _connection.ConnectionTimeout = Options.ConnectionTimeout.Milliseconds;
+            _connection.ConnectionTimeout = (int)Options.ConnectionTimeout.TotalMilliseconds;
 
             await _connection.ConnectAsync(Options.Host, Options.Port, cancellationToken)
                 .ConfigureAwait(false);
@@ -86,7 +86,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Failed to enrich claims from LDAP {LdapName} for user {Uid}", uid, Name);
+            _logger.LogError(e, "Failed to enrich claims from LDAP {LdapName} for user {Uid}", Name, uid);
         }
     }
 

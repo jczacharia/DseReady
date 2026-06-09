@@ -39,7 +39,7 @@ public static class ServiceDefaultsExtensions
 {
     public static void AddServiceDefaults(this IHostApplicationBuilder builder)
     {
-        builder.AddDseEnvironment();
+        builder.AddDse();
         builder.Services.AddHostedService<SourcesValidator>();
 
         builder.Services.AddResourceSetupOnStartup();
