@@ -2,19 +2,22 @@
 
 
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Authentication;
 using Dse.Auth;
 using Dse.Data;
 using Dse.ES;
 using Dse.Ingestion;
-using Dse.Messaging;
+using Dse.Ingestion.Events;
 using Dse.Shared;
 using Dse.Sources;
+using Humanizer;
+using JasperFx;
 using JasperFx.Resources;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
@@ -23,10 +26,15 @@ using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.ErrorHandling;
+using Wolverine.HealthChecks;
+using Wolverine.Runtime.Serialization;
+using Wolverine.Sqlite;
 
 namespace Dse;
 
-[ExcludeFromCodeCoverage]
 public static class ServiceDefaultsExtensions
 {
     public static void AddServiceDefaults(this IHostApplicationBuilder builder)
@@ -36,7 +44,55 @@ public static class ServiceDefaultsExtensions
 
         builder.Services.AddResourceSetupOnStartup();
         builder.AddDataContext();
-        builder.AddMessaging();
+
+        builder.Services.AddWolverine(opts =>
+        {
+            opts.DefaultSerializer = new SystemTextJsonSerializer(JsonDefaults.Web);
+
+            opts.ServiceName = builder.Environment.ApplicationName;
+            opts.ApplicationAssembly = typeof(ServiceDefaultsExtensions).Assembly;
+
+            opts.Durability.Mode = DurabilityMode.Solo;
+            opts.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
+
+            opts.PersistMessagesWithSqlite(builder.Configuration.GetSqliteConnectionString());
+            opts.UseEntityFrameworkCoreTransactions();
+            opts.PublishDomainEventsFromEntityFrameworkCore<IEntity>(x => x.Events);
+
+            opts.Policies.AutoApplyTransactions();
+            opts.Policies.UseDurableLocalQueues();
+            opts.Policies.UseDurableInboxOnAllListeners();
+            opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
+
+            opts.LocalQueueFor<IngestRunCreatedEvent>().Sequential();
+
+            opts.Policies
+                .OnException<ConcurrencyException>()
+                .RetryTimes(3)
+                .Then
+                .MoveToErrorQueue();
+
+            opts.Policies
+                .OnException<SqliteException>()
+                .Or<TimeoutException>()
+                .RetryWithCooldown(50.Milliseconds(), 100.Milliseconds(), 250.Milliseconds())
+                .Then
+                .MoveToErrorQueue();
+
+            opts.Policies
+                .OnException<InvalidOperationException>()
+                .Requeue()
+                .AndPauseProcessing(10.Minutes());
+
+            opts.Policies
+                .OnException<AuthenticationException>()
+                .MoveToErrorQueue();
+        });
+
+        builder.Services
+            .AddHealthChecks()
+            .AddWolverine(tags: ["live", "ready"])
+            .AddWolverineListeners(tags: ["ready"]);
 
         builder.Services.AddSingleton<DataMigrator>();
         builder.Services.AddHostedService<DataMigrator>(static sp => sp.GetRequiredService<DataMigrator>());
