@@ -24,10 +24,17 @@ ENV SL_SCAN_INCLUDEASSEMBLIES="Dse.*"
 
 USER root
 
+# Proxy for the agent download in restricted-network builds. HTTPS_PROXY is a predefined Docker build
+# arg; AGENT_PROXYURL is the fallback. Pass either with --build-arg (a bare `--build-arg HTTPS_PROXY`
+# inherits the value from the build environment). When neither is set, curl runs with no --proxy flag.
+ARG HTTPS_PROXY
+ARG AGENT_PROXYURL
+
 # Install the SeaLights .NET Core agent (glibc/RHEL 8 build) into /sealights.
 # Provides libSL.DotNet.ProfilerLib.Linux.so referenced by the CORECLR_* paths above.
 RUN mkdir -p /sealights/logs && \
-    curl -fsSL -o /tmp/sl-agent.tar.gz \
+    proxy="${HTTPS_PROXY:-${AGENT_PROXYURL}}" && \
+    curl -fsSL ${proxy:+--proxy "$proxy"} -o /tmp/sl-agent.tar.gz \
       https://agents.sealights.co/dotnetcore/latest/sealights-dotnet-agent-linux-self-contained.tar.gz && \
     tar -xzf /tmp/sl-agent.tar.gz --directory /sealights && \
     rm /tmp/sl-agent.tar.gz
