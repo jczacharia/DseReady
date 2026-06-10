@@ -194,7 +194,8 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     public async Task Cancel_an_already_finished_run_returns_409()
     {
         State.Total = 1;
-        Guid runId = await StartAndAwaitAsync(SpecModule.SourceKey, dryRun: true, s_admin); // runs through to a terminal checkpoint
+        Guid runId = await StartAndAwaitAsync(SpecModule.SourceKey, dryRun: true,
+            s_admin); // runs through to a terminal checkpoint
 
         await Scenario(s =>
         {

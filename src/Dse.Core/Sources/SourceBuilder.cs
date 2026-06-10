@@ -2,7 +2,6 @@
 
 
 using Dse.Ingestion;
-using Dse.Shared;
 using Elastic.Channels;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;

@@ -10,7 +10,6 @@ using Dse.Ingestion;
 using Dse.Ingestion.Events;
 using Dse.Shared;
 using Dse.Sources;
-using Elastic.Channels;
 using Humanizer;
 using JasperFx;
 using JasperFx.Resources;

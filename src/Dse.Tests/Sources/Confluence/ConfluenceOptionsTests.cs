@@ -15,7 +15,7 @@ public sealed class ConfluenceOptionsTests(ITestOutputHelper toh, TestFixture fi
     [Fact]
     public void ShouldBindCorrectValues()
     {
-        var options = Services.GetRequiredService<IOptionsMonitor<BufferOptions>>()
+        BufferOptions options = Services.GetRequiredService<IOptionsMonitor<BufferOptions>>()
             .Get(typeof(ConfluenceOptions).GetRequiredSourceKey());
 
         options.InboundBufferMaxSize.Should().Be(5000);

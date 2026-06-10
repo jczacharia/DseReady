@@ -8,12 +8,10 @@ namespace Dse.ES;
 
 internal sealed class ConfigureBufferOptions(ElasticStartupData data) : IConfigureNamedOptions<BufferOptions>
 {
-    public void Configure(string? name, BufferOptions options)
-    {
+    public void Configure(string? name, BufferOptions options) =>
         options.ExportMaxConcurrency = options.ExportMaxConcurrency is { } ec
             ? Math.Min(data.MaxChannelConcurrency, ec)
             : data.MaxChannelConcurrency;
-    }
 
     public void Configure(BufferOptions options) => Configure(Options.DefaultName, options);
 }

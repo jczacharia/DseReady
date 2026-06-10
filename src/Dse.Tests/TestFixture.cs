@@ -37,11 +37,11 @@ public sealed class TestFixture : IAsyncLifetime
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
 
+    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
+
     private IAlbaHost? _host;
 
     private Process? _process;
-
-    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
     public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

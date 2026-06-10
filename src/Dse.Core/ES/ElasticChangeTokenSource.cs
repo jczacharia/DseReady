@@ -14,7 +14,7 @@ public sealed class ElasticChangeTokenSource<TOptions> : IOptionsChangeTokenSour
 
     public void TriggerReload()
     {
-        var old = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
+        CancellationTokenSource old = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
         old.Cancel();
         old.Dispose();
     }

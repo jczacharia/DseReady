@@ -4,7 +4,6 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using Dse.Ingestion;
-using Elastic.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

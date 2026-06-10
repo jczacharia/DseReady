@@ -15,8 +15,6 @@ namespace Dse.Sources.Spec;
 /// </summary>
 public sealed class SpecIngest(SpecState state) : IIngest<SpecDoc>
 {
-    public void ConfigureBufferOptions(BufferOptions bufferOptions) => bufferOptions.OutboundBufferMaxSize = 250;
-
     public Task<long> GetDesiredTotalToProduceAsync(CancellationToken cancellationToken) =>
         Task.FromResult((long)state.Total);
 
@@ -43,6 +41,8 @@ public sealed class SpecIngest(SpecState state) : IIngest<SpecDoc>
             await context.WriteDocAsync(NewDoc(i), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    public void ConfigureBufferOptions(BufferOptions bufferOptions) => bufferOptions.OutboundBufferMaxSize = 250;
 
     private static SpecDoc NewDoc(long i) => new()
     {

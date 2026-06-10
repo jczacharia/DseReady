@@ -2,7 +2,6 @@
 
 
 using Dse.Ingestion.Endpoints;
-using Dse.Shared;
 using Dse.Sources;
 using Dse.Sources.Spec;
 using Elastic.Mapping;
