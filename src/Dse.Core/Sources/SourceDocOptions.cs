@@ -71,14 +71,10 @@ public static class SourceDocOptionsExtensions
         .Analyzer("q_text_bigram", a => a.Custom()
             .Tokenizer(BuiltInAnalysis.Tokenizers.Standard)
             .Filters(BuiltInAnalysis.TokenFilters.Lowercase, BuiltInAnalysis.TokenFilters.AsciiFolding, EnStemFilter,
-                "bigram_joiner_unigrams", "bigram_max_size"))
-        .Analyzer("html_english", a => a.Custom()
-            .CharFilter(BuiltInAnalysis.CharFilters.HtmlStrip)
-            .Tokenizer(BuiltInAnalysis.Tokenizers.Standard)
-            .Filters(BuiltInAnalysis.TokenFilters.Lowercase, BuiltInAnalysis.TokenFilters.AsciiFolding, EnStopWordsFilter,
-                EnStemFilter));
+                "bigram_joiner_unigrams", "bigram_max_size"));
 
     public static TextFieldBuilder DseText(this TextFieldBuilder b) => b
+        .Analyzer("iq_text_base")
         .MultiField("stem", mf => mf.Text().Analyzer("iq_text_stem"))
         .MultiField("delimiter", mf => mf.Text().Analyzer("iq_text_delimiter"))
         .MultiField("exact", mf => mf.Text().Analyzer("iq_text_exact"))
