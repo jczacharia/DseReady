@@ -160,6 +160,16 @@ public sealed class TestFixture : IAsyncLifetime
         {
             string index = typeContext.ResolveIndexFormat();
             Assert.StartsWith("test-", index);
+
+            // The keyed type context is a per-host singleton bound to one CreateContext(Guid), so every test
+            // in the run shares this single concrete index — a prior test's documents bleed into the next.
+            // Delete it by its concrete, host-unique name (never a wildcard → safe to issue on the shared ES
+            // node, works even under action.destructive_requires_name); also stops the per-host index leak.
+            string readTarget = typeContext.ResolveReadTarget();
+            Assert.StartsWith("test-", readTarget);
+            Assert.DoesNotContain("*", readTarget);
+            await Utils.IgnoreException(() => esClient.Indices.DeleteAsync(readTarget, Ct));
+
             await Utils.IgnoreException(() => esClient.Indices.DeleteIndexTemplateAsync($"{index}-template", Ct));
             await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-mappings", Ct));
             await Utils.IgnoreException(() => esClient.Cluster.DeleteComponentTemplateAsync($"{index}-template-settings", Ct));
