@@ -24,9 +24,10 @@ ENV SL_SCAN_INCLUDEASSEMBLIES="Dse.*"
 
 USER root
 
-# Proxy for the agent download in restricted-network builds. HTTPS_PROXY is a predefined Docker build
-# arg; AGENT_PROXYURL is the fallback. Pass either with --build-arg (a bare `--build-arg HTTPS_PROXY`
-# inherits the value from the build environment). When neither is set, curl runs with no --proxy flag.
+# Proxy for the agent download. The ADO template doesn't pass a proxy build-arg, so the effective proxy
+# defaults to PNC's egress proxy (the same one this pipeline's Sysdig step uses); HTTPS_PROXY/AGENT_PROXYURL
+# still override it via --build-arg if ever supplied. curl uses -4 because agents.sealights.co resolves
+# IPv6-only here and the agent has no IPv6 egress (the proxy itself is reached over IPv4).
 ARG HTTPS_PROXY
 ARG AGENT_PROXYURL
 
@@ -41,18 +42,18 @@ ARG AGENT_PROXYURL
 # the exact connect/TLS point of failure instead of a bare "curl: (35)". All curl flags are RHEL8-curl
 # (7.61) safe. Trim the diagnostics once the build is reliably reaching the network.
 RUN mkdir -p /sealights/logs && \
-    proxy="${HTTPS_PROXY:-${AGENT_PROXYURL}}" && \
+    proxy="${HTTPS_PROXY:-${AGENT_PROXYURL:-http://vz-proxy.pncint.net:8080}}" && \
     url="https://agents.sealights.co/dotnetcore/latest/sealights-dotnet-agent-linux-self-contained.tar.gz" && \
     echo "===== sealights agent download diagnostics =====" && \
     echo "[sl] HTTPS_PROXY=[${HTTPS_PROXY}] AGENT_PROXYURL=[${AGENT_PROXYURL}] -> effective proxy=[${proxy}]" && \
     curl --version | head -1 && \
     echo "[sl] DNS agents.sealights.co:" && (getent hosts agents.sealights.co || echo "[sl] !! DNS lookup FAILED") && \
     echo "[sl] connectivity probe (non-fatal):" && \
-    ( curl -sS -I -m 25 --insecure --proxy-insecure ${proxy:+--proxy "$proxy"} \
+    ( curl -4 -sS -I -m 25 --insecure --proxy-insecure ${proxy:+--proxy "$proxy"} \
         -w '[sl] probe -> http=%{http_code} time=%{time_total}s\n' "$url" ; \
       echo "[sl] probe curl exit=$?" ) && \
     echo "[sl] downloading (verbose):" && \
-    curl -v -fSL --connect-timeout 15 --max-time 300 --retry 3 --retry-delay 5 --retry-connrefused \
+    curl -4 -v -fSL --connect-timeout 15 --max-time 300 --retry 3 --retry-delay 5 --retry-connrefused \
       --insecure --proxy-insecure ${proxy:+--proxy "$proxy"} -o /tmp/sl-agent.tar.gz "$url" && \
     ls -l /tmp/sl-agent.tar.gz && \
     tar -xzf /tmp/sl-agent.tar.gz --directory /sealights && \
