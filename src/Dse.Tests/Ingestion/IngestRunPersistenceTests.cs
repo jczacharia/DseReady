@@ -18,8 +18,6 @@ namespace Dse.Tests.Ingestion;
 /// </summary>
 public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture fixture) : TestBed(toh, fixture)
 {
-    private SourceKey Confluence => Sources.Single(m => m.SourceKey.ToString() == "confluence").SourceKey;
-
     [Fact]
     public async Task Advancing_a_loaded_run_through_a_terminal_checkpoint_persists()
     {
@@ -27,7 +25,7 @@ public sealed class IngestRunPersistenceTests(ITestOutputHelper toh, TestFixture
         await using (AsyncServiceScope scope = Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DataContext>();
-            var run = IngestRun.Create(Confluence);
+            var run = IngestRun.Create("confluence");
             db.IngestRuns.Add(run);
             await db.SaveChangesAsync(Ct);
             id = run.Id;

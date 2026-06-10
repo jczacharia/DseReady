@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -18,7 +17,6 @@ namespace Dse.Runtime;
 ///     <see cref="HealthCheckServiceOptions.Registrations" /> that <c>MapDefaultHealthChecks</c> maps, so the document
 ///     stays in lock-step with what's actually served.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public sealed class HealthCheckDocumentFilter(IOptions<HealthCheckServiceOptions> healthChecks) : IDocumentFilter
 {
     private const string Tag = "Health";

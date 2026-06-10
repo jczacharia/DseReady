@@ -19,7 +19,7 @@ public sealed class SourcePipelineBuilder : IEndpointRouteBuilder, IEndpointConv
         SourceKey sourceKey)
     {
         SourceKey = sourceKey;
-        _group = sources.MapGroup(sourceKey.ToString());
+        _group = sources.MapGroup(sourceKey);
     }
 
     public SourceKey SourceKey { get; }

@@ -14,23 +14,46 @@ public interface IEntity
 {
     DateTimeOffset CreatedAt { get; set; }
     DateTimeOffset? UpdatedAt { get; set; }
-    IReadOnlyList<IDomainEvent> Events { get; }
-    public void Publish(IDomainEvent @event);
 }
 
-public interface IEntity<TKey> : IEntity where TKey : notnull
+public abstract class Entity<TId> : IEquatable<Entity<TId>>, IEntity where TId : notnull
 {
-    TKey Id { get; init; }
+    protected Entity() { } // Required for ORM hydration
+
+    protected Entity(TId id) => Id = id;
+
+    // default! required for ORM hydration; Id is set immediately after construction
+    public TId Id { get; protected set; } = default!;
+
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+
+    public bool Equals(Entity<TId>? other) =>
+        other is not null
+        && GetType() == other.GetType()
+        && EqualityComparer<TId>.Default.Equals(Id, other.Id);
+
+    public override bool Equals(object? obj) => obj is Entity<TId> other && Equals(other);
+
+    public override int GetHashCode() => EqualityComparer<TId>.Default.GetHashCode(Id);
+    public static bool operator ==(Entity<TId>? left, Entity<TId>? right) => Equals(left, right);
+    public static bool operator !=(Entity<TId>? left, Entity<TId>? right) => !Equals(left, right);
 }
 
-public abstract class Entity<TKey> : IEntity<TKey> where TKey : notnull
+public interface IAggregateRoot : IEntity
 {
-    private readonly List<object> _events = [];
-    public abstract TKey Id { get; init; }
-    public virtual DateTimeOffset CreatedAt { get; set; }
-    public virtual DateTimeOffset? UpdatedAt { get; set; }
-    IReadOnlyList<IDomainEvent> IEntity.Events => _events.OfType<IDomainEvent>().ToList();
-    public void Publish(IDomainEvent e) => _events.Add(e);
+    IReadOnlyList<IDomainEvent> DomainEvents { get; }
+}
+
+public abstract class AggregateRoot<TId> : Entity<TId>, IAggregateRoot where TId : notnull
+{
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    protected AggregateRoot() { }
+    protected AggregateRoot(TId id) : base(id) { }
+    public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    protected void RaiseDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
 }
 
 public sealed record EntityResponse<TKey>(TKey Id, Uri Location) where TKey : notnull;

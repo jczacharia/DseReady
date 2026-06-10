@@ -4,6 +4,7 @@
 using Dse.Data;
 using Dse.Ingestion.Events;
 using Dse.Sources;
+using EntityFrameworkCore.Projectables;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,36 +16,39 @@ namespace Dse.Ingestion;
 ///     releases the source's single-flight slot. Creating a run raises <see cref="IngestRunCreatedEvent" />, which
 ///     the EF transactional middleware publishes through Wolverine on save.
 /// </summary>
-public sealed class IngestRun : Entity<Guid>
+public sealed class IngestRun : AggregateRoot<Guid>
 {
+    // The history is the state. Exposed read-only and mutated only through Advance, so the terminal/no-backward
+    // invariant lives in exactly one place; EF maps the navigation via the backing field.
+    private readonly List<IngestProgress> _phases = [];
     private IngestRun() { }
+    private IngestRun(Guid id) : base(id) { }
 
-    public Source Source { get; init; } = null!;
     public SourceKey SourceKey { get; init; } = null!;
     public bool DryRun { get; init; }
 
     // Mirrors SourceKey while active, NULL once terminal. A filtered unique index on this column enforces one
     // active run per source; the endpoint maps the violation to 409.
     public SourceKey? ActiveSourceKey { get; private set; }
+    public IReadOnlyList<IngestProgress> Phases => _phases;
 
-    public List<IngestProgress> Phases { get; private init; } = [];
-
+    [Projectable]
     public IngestProgress CurrentProgress => Phases.OrderBy(p => p.CreatedAt).Last();
-    public bool IsTerminal => CurrentProgress.IsTerminal;
 
-    public override Guid Id { get; init; } = Guid.NewGuid();
+    [Projectable]
+    public bool IsTerminal => CurrentProgress.IsTerminal;
 
     public static IngestRun Create(SourceKey sourceKey, bool dryRun = false)
     {
-        IngestRun run = new()
+        var run = new IngestRun(Guid.NewGuid())
         {
             SourceKey = sourceKey,
             ActiveSourceKey = sourceKey,
             DryRun = dryRun,
-            Phases = [new IngestProgress { Checkpoint = IngestCheckpoint.Queued }],
         };
 
-        run.Publish(new IngestRunCreatedEvent(run.Id));
+        run._phases.Add(new IngestProgress(Guid.NewGuid()) { Checkpoint = IngestCheckpoint.Queued });
+        run.RaiseDomainEvent(new IngestRunCreatedEvent(run.Id));
         return run;
     }
 
@@ -57,12 +61,38 @@ public sealed class IngestRun : Entity<Guid>
             return;
         }
 
-        Phases.Add(progress);
+        _phases.Add(progress);
         if (progress.IsTerminal)
         {
             ActiveSourceKey = null;
         }
     }
+
+    /// <summary>
+    ///     Claims a queued run for execution. A run only ever starts from <see cref="IngestCheckpoint.Queued" />: an
+    ///     already-terminal run is finished, and a re-delivered run that had already started is recorded as
+    ///     <see cref="IngestCheckpoint.Interrupted" /> — runs never resume. Returns <c>true</c> only when the caller
+    ///     should proceed to execute; a <c>false</c> result may have advanced the run, so the caller must persist.
+    /// </summary>
+    public bool TryClaimForExecution()
+    {
+        if (IsTerminal)
+        {
+            return false;
+        }
+
+        if (CurrentProgress.Checkpoint is not IngestCheckpoint.Queued)
+        {
+            Advance(IngestProgress.At(IngestCheckpoint.Interrupted,
+                new { reason = "Re-delivered after a prior attempt had started; runs do not resume." }));
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Records the terminal Canceled checkpoint, releasing the source's single-flight slot.</summary>
+    public void Cancel(string reason) => Advance(IngestProgress.At(IngestCheckpoint.Canceled, new { reason }));
 }
 
 public sealed class IngestRunConfiguration : IEntityTypeConfiguration<IngestRun>
@@ -71,8 +101,9 @@ public sealed class IngestRunConfiguration : IEntityTypeConfiguration<IngestRun>
     {
         builder.ToTable(nameof(IngestRun));
 
+        // FK and referential integrity to the Source aggregate by key only — no CLR navigation across the boundary.
         builder
-            .HasOne(r => r.Source)
+            .HasOne<Source>()
             .WithMany()
             .HasPrincipalKey(s => s.Id)
             .HasForeignKey(r => r.SourceKey)
@@ -85,7 +116,7 @@ public sealed class IngestRunConfiguration : IEntityTypeConfiguration<IngestRun>
             .IsUnique()
             .HasFilter($"\"{nameof(IngestRun.ActiveSourceKey)}\" IS NOT NULL");
 
-        // The history always travels with the run.
-        builder.Navigation(r => r.Phases).AutoInclude();
+        // The history always travels with the run; the read-only navigation is read/written through its backing field.
+        builder.Navigation(r => r.Phases).AutoInclude().UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

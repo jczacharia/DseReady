@@ -15,7 +15,7 @@ public sealed class OpenApiHealthCheckTests(ITestOutputHelper toh, TestFixture f
     [Fact]
     public async Task Swagger_document_advertises_the_health_endpoints()
     {
-        (_, IScenarioResult result) = await Scenario(s =>
+        IScenarioResult result = await Scenario(s =>
         {
             s.Get.Url("/swagger/v1/swagger.json");
             s.StatusCodeShouldBeOk();

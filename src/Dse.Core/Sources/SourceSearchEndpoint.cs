@@ -37,7 +37,6 @@ public static class SourceSearchEndpoint
             return TypedResults.Empty;
         });
 
-    [ExcludeFromCodeCoverage]
     private sealed class CopyStreamPostData(Stream source) : PostData
     {
         public override void Write(Stream writableStream, ITransportConfiguration settings, bool disableDirectStreaming) =>

@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using Dse.Auth;
 using Dse.Ingestion.Endpoints;
 using Dse.Sources;
@@ -16,7 +15,6 @@ using Thinktecture.Swashbuckle;
 namespace Dse.Runtime;
 
 #pragma warning disable S1118 // Class instance needed for tests
-[ExcludeFromCodeCoverage]
 internal sealed class Program
 #pragma warning restore S1118
 {
@@ -63,6 +61,7 @@ internal sealed class Program
             })
             .AddThinktectureOpenApiFilters();
 
+        builder.Services.Configure<AuthenticationOptions>(builder.Configuration.GetSection("Authentication"));
         builder.Services
             .AddAuthentication()
             .AddPingJwtBearer()

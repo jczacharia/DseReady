@@ -87,7 +87,7 @@ internal static class ConfluenceHttpClients
 
     private static void ConfigureClient(IServiceProvider sp, HttpClient http)
     {
-        var opts = sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value;
+        ConfluenceOptions opts = sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value;
         http.BaseAddress = new Uri(opts.BaseAddress);
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         http.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
@@ -97,14 +97,18 @@ internal static class ConfluenceHttpClients
         }
     }
 
-    private static SocketsHttpHandler CreatePrimaryHandler(ConfluenceOptions opts) => new()
+    private static SocketsHttpHandler CreatePrimaryHandler(ConfluenceOptions opts)
     {
-        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
-        UseCookies = false,
-        AutomaticDecompression = DecompressionMethods.All,
-        ConnectTimeout = TimeSpan.FromSeconds(10),
-        UseProxy = opts.Proxy is { Length: > 0 } p1 && Uri.IsWellFormedUriString(p1, UriKind.Absolute),
-        Proxy = opts.Proxy is { Length: > 0 } p && Uri.IsWellFormedUriString(p, UriKind.Absolute) ? new WebProxy(p) : null,
-    };
+        WebProxy? proxy = opts.Proxy is { } p && Uri.IsWellFormedUriString(p, UriKind.Absolute) ? new WebProxy(p) : null;
+        return new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            UseCookies = false,
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            UseProxy = proxy is not null,
+            Proxy = proxy,
+        };
+    }
 }

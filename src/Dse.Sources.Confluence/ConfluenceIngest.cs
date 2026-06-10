@@ -2,7 +2,6 @@
 
 
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 using Dse.Ingestion;
 using Elastic.Channels;
@@ -11,23 +10,14 @@ using Microsoft.Extensions.Options;
 
 namespace Dse.Sources.Confluence;
 
-[ExcludeFromCodeCoverage]
 public sealed class ConfluenceIngest(
     IHttpClientFactory httpClientFactory,
     IOptionsSnapshot<ConfluenceOptions> options,
-    ILogger<ConfluenceIngest> logger)
-    : IIngest<ConfluenceDoc>
+    ILogger<ConfluenceIngest> logger) : IIngest<ConfluenceDoc>
 {
     private readonly string _cql = Uri.EscapeDataString(options.Value.ContentCql);
     private readonly string _expand = Uri.EscapeDataString(string.Join(separator: ',', options.Value.ContentExpand));
     private HttpClient BackFillClient => httpClientFactory.CreateClient(ConfluenceHttpClients.BackfillClient);
-
-    public BufferOptions BufferOptions { get; } = new()
-    {
-        InboundBufferMaxSize = options.Value.InboundBufferMaxSize,
-        OutboundBufferMaxSize = options.Value.OutboundBufferMaxSize,
-    };
-
 
     public async Task<long> GetDesiredTotalToProduceAsync(CancellationToken cancellationToken)
     {

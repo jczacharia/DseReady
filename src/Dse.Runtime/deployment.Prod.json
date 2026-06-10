@@ -1,7 +1,4 @@
 {
-    "Dse": {
-        "Environment": "Prod"
-    },
     "OpenApi": {
         "ExternalBaseUrl": "https://search.pncint.net/adv/api"
     },

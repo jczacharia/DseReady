@@ -2,7 +2,6 @@
 
 
 using AwesomeAssertions;
-using Wolverine.Tracking;
 
 namespace Dse.Tests.Auth;
 
@@ -19,7 +18,7 @@ public sealed class LdapHealthCheckTests(ITestOutputHelper toh, TestFixture fixt
     [InlineData("ldap-oud", "oud.dse.test")]
     public async Task Each_directory_exposes_its_own_self_labeled_health_route(string route, string host)
     {
-        (ITrackedSession _, IScenarioResult result) = await Scenario(s =>
+        IScenarioResult result = await Scenario(s =>
         {
             s.Get.Url($"/health/{route}");
             s.StatusCodeShouldBe(HttpStatusCode.ServiceUnavailable); // unreachable directory ⇒ unhealthy

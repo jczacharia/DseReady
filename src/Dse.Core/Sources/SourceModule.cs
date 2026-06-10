@@ -26,7 +26,6 @@ public abstract class SourceModule<TDoc>(string key) : SourceModule(key) where T
     public sealed override void Register(IServiceCollection services) => Register(new SourceBuilder<TDoc>(this, services));
 
     public abstract void Configure(SourcePipelineBuilder builder);
-
     public sealed override void Configure(IEndpointRouteBuilder app) => Configure(new SourcePipelineBuilder(app, SourceKey));
 }
 
@@ -50,16 +49,4 @@ public static class SourceModuleExtensions
 
     public static SourceKey GetRequiredSourceKey(this Type type) => type.GetRequiredSourceModule().SourceKey;
     public static SourceKey GetRequiredSourceKey(this object obj) => obj.GetType().GetRequiredSourceKey();
-
-    public static ElasticsearchTypeContext? GetTypeContext(this Type type, IServiceProvider sp) =>
-        type.GetSourceModule()?.GetTypeContext(sp);
-
-    public static ElasticsearchTypeContext? GetTypeContext(this object obj, IServiceProvider sp) =>
-        obj.GetType().GetTypeContext(sp);
-
-    public static ElasticsearchTypeContext GetRequiredTypeContext(this Type type, IServiceProvider sp) =>
-        type.GetRequiredSourceModule().GetTypeContext(sp.GetRequiredService<IHostEnvironment>());
-
-    public static ElasticsearchTypeContext GetRequiredTypeContext(this object obj, IServiceProvider sp) =>
-        obj.GetType().GetRequiredTypeContext(sp);
 }

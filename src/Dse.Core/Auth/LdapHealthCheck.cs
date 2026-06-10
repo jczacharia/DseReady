@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Novell.Directory.Ldap;
@@ -13,7 +12,6 @@ namespace Dse.Auth;
 ///     <see cref="LdapConnector" />. Directory-agnostic — it labels itself from the connector, so the same check
 ///     serves every keyed connector (AD, OUD, …); one registration per key supplies the right one.
 /// </summary>
-[ExcludeFromCodeCoverage]
 internal sealed class LdapHealthCheck(LdapConnector connector, ILogger<LdapHealthCheck> logger) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(

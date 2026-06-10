@@ -15,7 +15,7 @@ public sealed record IngestRunCreatedEvent(Guid RunId) : IDomainEvent;
 public sealed class IngestRunCreatedHandler
 {
     // The default 60s handler timeout would kill any real crawl. This is the hard ceiling for a single run.
-    private const int ExecutionTimeoutSeconds = 6 * 60 * 60;
+    private const int ExecutionTimeoutSeconds = 6 * 60 * 60; // 6 hours
 
     [MessageTimeout(ExecutionTimeoutSeconds)]
     public static async Task Handle(
@@ -35,17 +35,10 @@ public sealed class IngestRunCreatedHandler
             return;
         }
 
-        // Execute at most once. A terminal run is already done (or canceled while queued); a non-Queued, non-terminal
-        // run was started by a prior attempt and never finished — runs never resume, so finalize it as interrupted.
-        if (run.IsTerminal)
+        // Execute at most once: the aggregate decides whether this delivery may run, recording an interrupted
+        // terminal for a re-delivered run that had already started (runs never resume).
+        if (!run.TryClaimForExecution())
         {
-            return;
-        }
-
-        if (run.CurrentProgress.Checkpoint is not IngestCheckpoint.Queued)
-        {
-            run.Advance(IngestProgress.At(IngestCheckpoint.Interrupted,
-                new { reason = "Re-delivered after a prior attempt had started; runs do not resume." }));
             await db.SaveChangesAsync(ct);
             return;
         }

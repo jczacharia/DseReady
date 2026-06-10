@@ -10,6 +10,7 @@ using Dse.Ingestion;
 using Dse.Ingestion.Events;
 using Dse.Shared;
 using Dse.Sources;
+using Elastic.Channels;
 using Humanizer;
 using JasperFx;
 using JasperFx.Resources;
@@ -39,7 +40,7 @@ public static class ServiceDefaultsExtensions
 {
     public static void AddServiceDefaults(this IHostApplicationBuilder builder)
     {
-        builder.AddDse();
+        builder.AddDseOptions();
         builder.Services.AddHostedService<SourcesValidator>();
 
         builder.Services.AddResourceSetupOnStartup();
@@ -57,7 +58,7 @@ public static class ServiceDefaultsExtensions
 
             opts.PersistMessagesWithSqlite(builder.Configuration.GetSqliteConnectionString());
             opts.UseEntityFrameworkCoreTransactions();
-            opts.PublishDomainEventsFromEntityFrameworkCore<IEntity>(x => x.Events);
+            opts.PublishDomainEventsFromEntityFrameworkCore<IAggregateRoot, IDomainEvent>(x => x.DomainEvents);
 
             opts.Policies.AutoApplyTransactions();
             opts.Policies.UseDurableLocalQueues();

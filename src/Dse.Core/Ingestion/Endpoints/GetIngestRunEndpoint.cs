@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Dse.Auth;
 using Dse.Data;
@@ -24,13 +23,11 @@ public sealed record IngestRunStatus(
 
 public static class GetIngestRunEndpoint
 {
-    public static RouteHandlerBuilder MapGetIngestRunEndpoint(
-        this SourcePipelineBuilder builder,
-        [StringSyntax("Route")] string pattern = "ingest/{runId:guid}")
+    public static RouteHandlerBuilder MapGetIngestRunEndpoint(this SourcePipelineBuilder builder)
     {
         SourceKey sourceKey = builder.SourceKey;
 
-        return builder.MapGet(pattern, async Task<Results<Ok<IngestRunStatus>, ProblemHttpResult>> (
+        return builder.MapGet("ingest/{runId:guid}", async Task<Results<Ok<IngestRunStatus>, ProblemHttpResult>> (
                 Guid runId,
                 HttpContext context,
                 DataContext db,

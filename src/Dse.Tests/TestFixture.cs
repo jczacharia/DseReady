@@ -4,8 +4,9 @@
 using System.Diagnostics;
 using Dse.Runtime;
 using Dse.Shared;
+using Dse.Sources;
+using Dse.Sources.Spec;
 using Dse.Tests;
-using Dse.Tests.Ingestion;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Mapping;
 using JasperFx.CommandLine;
@@ -36,11 +37,11 @@ public sealed class TestFixture : IAsyncLifetime
     private static readonly TimeSpan s_downloadTimeout = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan s_shutdownTimeout = TimeSpan.FromSeconds(30);
 
-    public string DbFilename { get; } = $"{Guid.NewGuid().ToString("N")[..10]}.db";
-
     private IAlbaHost? _host;
 
     private Process? _process;
+
+    private readonly string _dbFilename = $"{Guid.NewGuid().ToString("N")[..10]}.db";
     public IAlbaHost Host => _host ?? throw new InvalidOperationException("Test fixture not initialized.");
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -81,32 +82,21 @@ public sealed class TestFixture : IAsyncLifetime
 
             builder.ConfigureServices(services =>
             {
+                services.AddSourceManifest<Spec>();
                 services.AddResourceSetupOnStartup(StartupAction.ResetState);
                 services.RunWolverineInSoloMode();
                 services
                     .AddAuthentication("Test")
                     .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", configureOptions: null);
-                services.AddSingleton<StubConfluenceState>();
-                foreach (string client in (string[])["confluence", "confluence-readthrough"])
-                {
-                    services
-                        .AddHttpClient(client)
-                        .ConfigurePrimaryHttpMessageHandler(sp =>
-                            new StubConfluenceHandler(sp.GetRequiredService<StubConfluenceState>()));
-                }
             });
         }, new TestConfigurationExtension(builder =>
         {
             builder.AddConfiguration(config.Build());
             builder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:sqlite"] = $"Data Source={DbFilename}",
+                ["ConnectionStrings:sqlite"] = $"Data Source={_dbFilename}",
                 ["Ldap:Ad:Host"] = "ad.dse.test",
-                ["Ldap:Ad:SearchBase"] = "DC=ad,DC=dse,DC=test",
-                ["Ldap:Ad:GroupsAttribute"] = "memberOf",
                 ["Ldap:Oud:Host"] = "oud.dse.test",
-                ["Ldap:Oud:SearchBase"] = "o=dse-oud",
-                ["Ldap:Oud:GroupsAttribute"] = "groupMembership",
             });
         }));
 
@@ -124,9 +114,10 @@ public sealed class TestFixture : IAsyncLifetime
         // Clear the SQLite connection pool so the file handle is released,
         // then delete the per-run database file.
         SqliteConnection.ClearAllPools();
-        if (!string.IsNullOrEmpty(DbFilename) && File.Exists(DbFilename))
+
+        if (File.Exists(_dbFilename))
         {
-            File.Delete(DbFilename);
+            File.Delete(_dbFilename);
         }
 
         if (_process is null)
@@ -155,8 +146,8 @@ public sealed class TestFixture : IAsyncLifetime
 
     public async Task ResetAsync()
     {
-        await DataContextRespawner.RespawnAsync($"Data Source={DbFilename}", Ct);
-        Host.Services.GetService<StubConfluenceState>()?.Reset();
+        await DataContextRespawner.RespawnAsync($"Data Source={_dbFilename}", Ct);
+        Host.Services.GetService<SpecState>()?.Reset();
         await Host.SetupResources();
         await Host.TeardownResources();
         await Host.ResetResourceState();

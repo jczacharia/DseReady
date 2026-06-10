@@ -15,7 +15,7 @@ public static class SourceHealthCheckEndpoint
         [StringSyntax("Route")] string pattern,
         Action<HealthCheckOptions>? configure = null)
     {
-        HealthCheckOptions options = new() { Predicate = r => r.Name == builder.SourceKey.ToString() };
+        HealthCheckOptions options = new() { Predicate = r => r.Name == builder.SourceKey };
         options.WithReportWriter();
         configure?.Invoke(options);
         return builder.MapHealthChecks(pattern, options);

@@ -2,15 +2,11 @@
 
 
 using Dse.Sources;
-using Elastic.Channels;
 using Elastic.Ingest.Elasticsearch;
 
 namespace Dse.Ingestion;
 
-public interface IIngest
-{
-    BufferOptions BufferOptions { get; }
-}
+public interface IIngest;
 
 public interface IIngest<out TDoc> : IIngest where TDoc : class
 {

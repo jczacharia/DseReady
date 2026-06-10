@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json.Serialization;
 using Elastic.Mapping;
@@ -9,7 +8,6 @@ using Elastic.Mapping.Mappings;
 
 namespace Dse.Sources.Confluence;
 
-[ExcludeFromCodeCoverage]
 public sealed class ConfluenceDoc
 {
     [Id]
@@ -60,11 +58,11 @@ public sealed class ConfluenceDoc
     [JsonPropertyName("createdBy")]
     public required User CreatedBy { get; set; }
 
-    [Nested]
+    [Object]
     [JsonPropertyName("ancestors")]
     public required Ancestor[] Ancestors { get; set; }
 
-    [Nested]
+    [Object]
     [JsonPropertyName("labels")]
     public required Label[] Labels { get; set; }
 
@@ -165,14 +163,13 @@ public static partial class ConfluenceContext;
 
 public sealed class ConfluenceDocConfiguration : SourceDocOptions<ConfluenceDoc>
 {
-    public override MappingsBuilder<ConfluenceDoc> ConfigureMappings(MappingsBuilder<ConfluenceDoc> mappings) =>
-        mappings
-            .Type(b => b.DseKeyword())
-            .Title(b => b.DseKeyword())
-            .Body(b => b.DseText())
-            .Space(b => b.Key(k => k.DseKeyword()).Name(n => n.DseKeyword()))
-            .VersionBy(v => v.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
-            .CreatedBy(c => c.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
-            .Ancestors(a => a.Title(t => t.DseKeyword()))
-            .Labels(l => l.Name(n => n.DseKeyword()));
+    public override MappingsBuilder<ConfluenceDoc> ConfigureMappings(MappingsBuilder<ConfluenceDoc> mappings) => mappings
+        .Type(b => b.DseKeyword())
+        .Title(b => b.DseKeyword())
+        .Body(b => b.DseText())
+        .Space(b => b.Key(k => k.DseKeyword()).Name(n => n.DseKeyword()))
+        .VersionBy(v => v.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
+        .CreatedBy(c => c.DisplayName(d => d.DseKeyword()).Username(u => u.DseKeyword()))
+        .Ancestors(a => a.Title(t => t.DseKeyword()))
+        .Labels(l => l.Name(n => n.DseKeyword()).Prefix(p => p.DseKeyword()));
 }

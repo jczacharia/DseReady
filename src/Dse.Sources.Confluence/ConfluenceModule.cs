@@ -1,13 +1,13 @@
 ﻿// Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using System.ComponentModel.DataAnnotations;
 using Dse.Ingestion.Endpoints;
 using Dse.Shared;
 using Dse.Sources;
 using Dse.Sources.Confluence;
 using Elastic.Mapping;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Wolverine.Attributes;
 
@@ -15,6 +15,29 @@ using Wolverine.Attributes;
 [assembly: WolverineModule]
 
 namespace Dse.Sources.Confluence;
+
+public sealed class ConfluenceOptions
+{
+    public string BaseAddress { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string? Proxy { get; set; }
+
+    [Range(minimum: 1, maximum: 50)]
+    public int PageSize { get; set; } = 50;
+
+    public string ContentCql { get; set; } = "type in (page,blogpost) order by lastModified desc";
+
+    public string[] ContentExpand { get; set; } =
+    [
+        "ancestors",
+        "body.storage",
+        "history",
+        "metadata.labels",
+        "space",
+        "version",
+    ];
+}
 
 public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
 {
@@ -24,11 +47,7 @@ public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
 
     public override void Register(SourceBuilder<ConfluenceDoc> builder)
     {
-        builder.Services
-            .AddOptions<ConfluenceOptions>()
-            .BindConfiguration(ConfluenceOptions.SectionName)
-            .ValidateDataAnnotations()
-            .ValidateOnStart()
+        builder.AddOptions<ConfluenceOptions>()
             .PostDseConfigure(static (o, dse) =>
             {
                 if (dse.LocalCredentials() is { } cred)
@@ -45,7 +64,8 @@ public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
 
     public override void Configure(SourcePipelineBuilder builder)
     {
-        builder.MapIngestEndpoints();
+        builder.MapIngestEndpoint();
+        builder.MapDryIngestEndpoint();
         builder.MapGetIngestRunEndpoint();
         builder.MapCancelIngestRunEndpoint();
 

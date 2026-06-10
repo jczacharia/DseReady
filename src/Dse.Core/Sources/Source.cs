@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using Dse.Data;
 using Microsoft.EntityFrameworkCore;
@@ -13,11 +12,10 @@ namespace Dse.Sources;
 /// <summary>
 ///     Key used to identify a Source.
 /// </summary>
-[ExcludeFromCodeCoverage]
 [ValueObject<string>(
-    UnsafeConversionToKeyMemberType = ConversionOperatorsGeneration.Explicit,
-    ConversionFromKeyMemberType = ConversionOperatorsGeneration.Explicit,
-    ConversionToKeyMemberType = ConversionOperatorsGeneration.Explicit
+    UnsafeConversionToKeyMemberType = ConversionOperatorsGeneration.Implicit,
+    ConversionFromKeyMemberType = ConversionOperatorsGeneration.Implicit,
+    ConversionToKeyMemberType = ConversionOperatorsGeneration.Implicit
 )]
 [KeyMemberEqualityComparer<ComparerAccessors.StringOrdinalIgnoreCase, string>]
 [KeyMemberComparer<ComparerAccessors.StringOrdinalIgnoreCase, string>]
@@ -38,8 +36,7 @@ public sealed partial class SourceKey
 
         if (!Pattern().IsMatch(value))
         {
-            validationError =
-                new ValidationError("Invalid SourceKey. Must be 1-30 chars, lowercase alphanumeric, and start with a letter.");
+            validationError = new ValidationError("Must be 1-30 chars, lowercase alphanumeric, and start with a letter.");
         }
     }
 }
@@ -47,16 +44,15 @@ public sealed partial class SourceKey
 public sealed class Source : Entity<SourceKey>
 {
     private Source() { }
-    public override required SourceKey Id { get; init; }
+    private Source(SourceKey key) : base(key) { }
     public string AssemblyQualifiedName { get; private init; } = null!;
     public SourceModule GetModule() => Type.GetType(AssemblyQualifiedName)!.GetRequiredSourceModule();
 
     public static Source FromType(Type type)
     {
         SourceModule module = type.GetRequiredSourceModule();
-        return new Source
+        return new Source(module.SourceKey)
         {
-            Id = module.SourceKey,
             AssemblyQualifiedName =
                 module.GetType().AssemblyQualifiedName ??
                 throw new InvalidOperationException($"AssemblyQualifiedName is null for type {module.GetType()}"),

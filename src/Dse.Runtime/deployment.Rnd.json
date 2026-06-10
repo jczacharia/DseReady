@@ -1,7 +1,4 @@
 {
-    "Dse": {
-        "Environment": "Rnd"
-    },
     "OpenApi": {
         "ExternalBaseUrl": "https://search-rnd.pncint.net/adv/api"
     },

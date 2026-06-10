@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Dse.Auth;
 using Dse.Data;
@@ -17,9 +16,8 @@ namespace Dse.Ingestion.Endpoints;
 public static class CancelIngestRunEndpoint
 {
     public static RouteHandlerBuilder MapCancelIngestRunEndpoint(
-        this SourcePipelineBuilder builder,
-        [StringSyntax("Route")] string pattern = "ingest/{runId:guid}/cancel") =>
-        builder.MapPost(pattern, async Task<Results<Accepted, ProblemHttpResult>> (
+        this SourcePipelineBuilder builder) =>
+        builder.MapPost("ingest/{runId:guid}/cancel", async Task<Results<Accepted, ProblemHttpResult>> (
                 Guid runId,
                 HttpContext context,
                 DataContext db,
@@ -40,7 +38,7 @@ public static class CancelIngestRunEndpoint
                 // Authoritative + force: record the terminal Canceled first so the source's single-flight slot is
                 // freed even if the pipeline is wedged, then signal cooperative cancellation so a responsive run
                 // unwinds promptly.
-                run.Advance(IngestProgress.At(IngestCheckpoint.Canceled, new { reason = "Canceled via API." }));
+                run.Cancel("Canceled via API.");
                 await db.SaveChangesAsync(ct);
                 control.SignalCancellation(runId);
 

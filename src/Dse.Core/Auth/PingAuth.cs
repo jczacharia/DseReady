@@ -4,13 +4,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using Dse.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -18,7 +15,6 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Dse.Auth;
 
-[ExcludeFromCodeCoverage]
 public sealed class PingOptions
 {
     public const string SchemeName = "Ping";
@@ -124,6 +120,7 @@ public static class PingAuthOptionsExtensions
                     },
                 };
             });
-        return builder.AddJwtBearer(PingOptions.SchemeName);
+        builder.AddJwtBearer(PingOptions.SchemeName);
+        return builder;
     }
 }

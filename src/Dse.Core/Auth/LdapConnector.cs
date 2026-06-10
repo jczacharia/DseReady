@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Text;
 using Dse.Shared;
@@ -15,7 +14,6 @@ using Novell.Directory.Ldap;
 
 namespace Dse.Auth;
 
-[ExcludeFromCodeCoverage]
 public sealed class LdapConnector(string name, IServiceProvider services) : IDisposable
 {
     private readonly IMemoryCache _cache = services.GetRequiredService<IMemoryCache>();
@@ -57,14 +55,11 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
 
             _connection.ConnectionTimeout = (int)Options.ConnectionTimeout.TotalMilliseconds;
 
-            await _connection.ConnectAsync(Options.Host, Options.Port, cancellationToken)
-                .ConfigureAwait(false);
+            await _connection.ConnectAsync(Options.Host, Options.Port, cancellationToken).ConfigureAwait(false);
 
-            if (!string.IsNullOrWhiteSpace(Options.BindDn) &&
-                !string.IsNullOrWhiteSpace(Options.BindPassword))
+            if (!string.IsNullOrWhiteSpace(Options.BindDn) && !string.IsNullOrWhiteSpace(Options.BindPassword))
             {
-                await _connection.BindAsync(Options.BindDn, Options.BindPassword, cancellationToken)
-                    .ConfigureAwait(false);
+                await _connection.BindAsync(Options.BindDn, Options.BindPassword, cancellationToken).ConfigureAwait(false);
             }
 
             return _connection;

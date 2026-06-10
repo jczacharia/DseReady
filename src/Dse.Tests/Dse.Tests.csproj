@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dse.Runtime\Dse.Runtime.csproj"/>
+    <ProjectReference Include="..\Dse.Sources.Spec\Dse.Sources.Spec.csproj" />
   </ItemGroup>
 
 </Project>

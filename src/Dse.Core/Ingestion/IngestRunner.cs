@@ -4,7 +4,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Dse.Data;
-using Dse.ES;
 using Dse.Shared;
 using Dse.Sources;
 using Elastic.Channels;
@@ -15,15 +14,16 @@ using Elastic.Mapping;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dse.Ingestion;
 
 public sealed class IngestRunner<TDoc>(
     DataContext db,
     IIngest<TDoc> ingest,
-    ElasticStartupService elasticStartup,
     ElasticsearchClient client,
     ILoggerFactory loggerFactory,
+    IOptionsMonitor<BufferOptions> bufferOptions,
     IServiceProvider services) : IIngestRunner where TDoc : class
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger($"{typeof(TDoc).GetRequiredSourceKey()}Ingestor");
@@ -65,26 +65,19 @@ public sealed class IngestRunner<TDoc>(
                 $"but this runner serves '{SourceKey}'.");
         }
 
-        bool dryRun = run.DryRun;
-        ElasticStartupData esData = elasticStartup.Data;
-
         try
         {
             // Claim: moves the run off Queued so a post-crash redelivery is recognized as interrupted, not restarted.
-            run.Advance(Progress(IngestCheckpoint.Started, new { run.DryRun }));
-            await SaveAsync(run, ct);
+            await AdvanceAsync(run, IngestCheckpoint.Started, ct, new { run.DryRun });
 
-            BufferOptions bufferOptions = ingest.BufferOptions;
-            bufferOptions.ExportMaxConcurrency = bufferOptions.ExportMaxConcurrency is { } exportMaxConcurrency
-                ? Math.Min(esData.MaxChannelConcurrency, exportMaxConcurrency)
-                : esData.MaxChannelConcurrency;
+            BufferOptions bufOpts = bufferOptions.Get(SourceKey);
 
             using IngestChannel<TDoc> channel = new(new IngestChannelOptions<TDoc>(
                 client.Transport,
                 _typeContext,
                 _typeContext.IndexPatternUseBatchDate ? DateTimeOffset.UtcNow : null)
             {
-                BufferOptions = bufferOptions,
+                BufferOptions = bufOpts,
                 ExportItemsAttemptCallback = (retries, count) =>
                 {
                     if (retries == 0)
@@ -95,8 +88,7 @@ public sealed class IngestRunner<TDoc>(
                 // Surface bulk/per-item errors so the gate below fails the run instead of aliasing junk.
                 ExportResponseCallback = (response, _) =>
                 {
-                    if (response is { Items: { } items }
-                        && items.Count(i => i.Error is not null) is var itemErrors and > 0)
+                    if (response is { Items: { } items } && items.Count(i => i.Error is not null) is var itemErrors and > 0)
                     {
                         Interlocked.Add(ref _failedDocuments, itemErrors);
                         _logger.LogError("Bulk export reported {ErrorCount} item error(s) (e.g. '{Reason}')",
@@ -122,47 +114,42 @@ public sealed class IngestRunner<TDoc>(
             });
 
             await channel.BootstrapElasticsearchAsync(BootstrapMethod.Failure, ct);
-            run.Advance(Progress(IngestCheckpoint.Bootstrapped,
-                new { channel.IndexName, channel.BatchExportSize, channel.DrainSize, channel.MaxConcurrency }));
-            await SaveAsync(run, ct);
+            await AdvanceAsync(run, IngestCheckpoint.Bootstrapped, ct,
+                new { channel.IndexName, channel.BatchExportSize, channel.DrainSize, channel.MaxConcurrency });
 
             long totalToProduce = await ingest.GetDesiredTotalToProduceAsync(ct);
-            TotalToProduce = dryRun ? Math.Clamp(totalToProduce, min: 0, max: 1) : totalToProduce;
-            run.Advance(Progress(IngestCheckpoint.TotalMeasured, new { Total = TotalToProduce }));
-            await SaveAsync(run, ct);
+            TotalToProduce = run.DryRun ? Math.Clamp(totalToProduce, min: 0, max: 1) : totalToProduce;
+            await AdvanceAsync(run, IngestCheckpoint.TotalMeasured, ct, new { Total = TotalToProduce });
 
             IngestContext<TDoc> context = new(channel, TotalToProduce);
             _stopwatch.Start();
 
-            run.Advance(Progress(IngestCheckpoint.Ingesting));
-            await SaveAsync(run, ct);
+            await AdvanceAsync(run, IngestCheckpoint.Ingesting, ct);
             await ingest.IngestAsync(context, ct);
 
-            run.Advance(Progress(IngestCheckpoint.Draining));
-            await SaveAsync(run, ct);
+            await AdvanceAsync(run, IngestCheckpoint.Draining, ct);
             if (!await channel.WaitForDrainAsync(TimeSpan.FromHours(1), ct))
             {
-                run.Advance(Progress(IngestCheckpoint.Failed, new { reason = "Channel timed out while waiting for drain" }));
-                await SaveAsync(run, CancellationToken.None);
+                await AdvanceAsync(run, IngestCheckpoint.Failed, ct,
+                    new { reason = "Channel timed out while waiting for drain" });
                 return;
             }
 
-            if (dryRun)
+            if (run.DryRun)
             {
                 await DeleteTransientIndexAsync(channel.IndexName, ct);
             }
 
             if (Interlocked.Read(ref _failedDocuments) is var failed and > 0)
             {
-                run.Advance(Progress(IngestCheckpoint.Failed,
-                    new { reason = $"{failed} document(s) failed to index; alias not promoted." }));
-                await SaveAsync(run, CancellationToken.None);
+                await AdvanceAsync(run, IngestCheckpoint.Failed, ct,
+                    new { reason = $"{failed} document(s) failed to index; alias not promoted." });
                 return;
             }
 
             // Last gate before the only visible side effect: if the run was canceled out from under us, never
             // promote the alias. Searchers keep seeing the previous good index.
-            if (!dryRun)
+            if (!run.DryRun)
             {
                 if (!await StillActiveAsync(run))
                 {
@@ -170,12 +157,10 @@ public sealed class IngestRunner<TDoc>(
                     return;
                 }
 
-                run.Advance(Progress(IngestCheckpoint.Aliasing));
-                await SaveAsync(run, ct);
+                await AdvanceAsync(run, IngestCheckpoint.Aliasing, ct);
                 if (!await channel.ApplyAliasesAsync(channel.IndexName, ct))
                 {
-                    run.Advance(Progress(IngestCheckpoint.Failed, new { reason = "Alias application failed" }));
-                    await SaveAsync(run, CancellationToken.None);
+                    await AdvanceAsync(run, IngestCheckpoint.Failed, ct, new { reason = "Alias application failed" });
                     return;
                 }
 
@@ -189,8 +174,7 @@ public sealed class IngestRunner<TDoc>(
                 }
             }
 
-            run.Advance(Progress(IngestCheckpoint.Succeeded));
-            await SaveAsync(run, CancellationToken.None);
+            await AdvanceAsync(run, IngestCheckpoint.Succeeded, ct);
         }
         catch (OperationCanceledException)
         {
@@ -198,9 +182,8 @@ public sealed class IngestRunner<TDoc>(
             // shutdown or the execution timeout fired. Defer to the API if it already finalized the run.
             if (await StillActiveAsync(run))
             {
-                run.Advance(Progress(IngestCheckpoint.Interrupted,
-                    new { reason = "Ingestion was interrupted (shutdown or execution timeout)." }));
-                await SaveAsync(run, CancellationToken.None);
+                await AdvanceAsync(run, IngestCheckpoint.Interrupted, ct,
+                    new { reason = "Ingestion was interrupted (shutdown or execution timeout)." });
             }
         }
         catch (Exception e)
@@ -208,8 +191,7 @@ public sealed class IngestRunner<TDoc>(
             _logger.LogError(e, "Ingest run failed with an exception");
             if (await StillActiveAsync(run))
             {
-                run.Advance(Progress(IngestCheckpoint.Faulted, new { exception = ExceptionDto.From(e) }));
-                await SaveAsync(run, CancellationToken.None);
+                await AdvanceAsync(run, IngestCheckpoint.Faulted, ct, new { exception = ExceptionDto.From(e) });
             }
         }
     }
@@ -250,23 +232,29 @@ public sealed class IngestRunner<TDoc>(
         await db.SaveChangesAsync(ct);
     }
 
-    private IngestProgress Progress(IngestCheckpoint checkpoint, object? metadata = null)
+    // Advance the run one checkpoint and persist it. A terminal checkpoint saves with a fresh token: the run may be
+    // reaching that terminal *because* it was canceled, and the outcome must still be recorded.
+    private async Task AdvanceAsync(IngestRun run, IngestCheckpoint checkpoint, CancellationToken ct, object? metadata = null)
     {
         _checkpoint = checkpoint;
-        return new IngestProgress
-        {
-            Checkpoint = checkpoint,
-            TotalToProduce = TotalToProduce,
-            Elapsed = Elapsed,
-            PercentComplete = PercentComplete,
-            DocsPerSecond = DocsPerSecond,
-            EstimatedRemaining = EstimatedRemaining,
-            Produced = Produced,
-            ManagedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false),
-            WorkingMemoryBytes = Environment.WorkingSet,
-            Metadata = metadata is null
-                ? JsonDocument.Parse("{}")
-                : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
-        };
+        IngestProgress progress = Progress(checkpoint, metadata);
+        run.Advance(progress);
+        await SaveAsync(run, progress.IsTerminal ? CancellationToken.None : ct);
     }
+
+    private IngestProgress Progress(IngestCheckpoint checkpoint, object? metadata = null) => new(Guid.NewGuid())
+    {
+        Checkpoint = checkpoint,
+        TotalToProduce = TotalToProduce,
+        Elapsed = Elapsed,
+        PercentComplete = PercentComplete,
+        DocsPerSecond = DocsPerSecond,
+        EstimatedRemaining = EstimatedRemaining,
+        Produced = Produced,
+        ManagedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false),
+        WorkingMemoryBytes = Environment.WorkingSet,
+        Metadata = metadata is null
+            ? JsonDocument.Parse("{}")
+            : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
+    };
 }

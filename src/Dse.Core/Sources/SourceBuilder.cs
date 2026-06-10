@@ -3,11 +3,12 @@
 
 using Dse.Ingestion;
 using Dse.Shared;
-using Elastic.Ingest.Elasticsearch.Strategies;
+using Elastic.Channels;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Dse.Sources;
 
@@ -22,6 +23,7 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
         Services.AddSingleton(module);
         Services.AddSingleton(module.SourceKey);
         Services.AddKeyedSingleton(module.SourceKey, module);
+        Services.AddOptions<BufferOptions>(SourceKey).BindConfiguration(SourceKey);
         Services.AddKeyedSingleton<ElasticsearchTypeContext>(module.SourceKey, (sp, _) =>
         {
             var env = sp.GetRequiredService<IHostEnvironment>();
@@ -49,17 +51,15 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
     public IServiceCollection Services { get; }
     public SourceKey SourceKey => _module.SourceKey;
 
-    public void AddIngestion<TIngest>()
-        where TIngest : class, IIngest<TDoc>
+    public OptionsBuilder<TOptions> AddOptions<TOptions>() where TOptions : class =>
+        Services.AddOptions<TOptions>().BindConfiguration(SourceKey).ValidateDataAnnotations().ValidateOnStart();
+
+    public void AddIngestion<TIngest>() where TIngest : class, IIngest<TDoc>
     {
         Services.AddScoped<IIngest<TDoc>, TIngest>();
         Services.AddKeyedScoped<IIngestRunner, IngestRunner<TDoc>>(SourceKey);
     }
 
-    public void AddHealthCheck<TCheck>(HealthStatus status = HealthStatus.Degraded, TimeSpan? timeout = null)
-        where TCheck : class, IHealthCheck
-    {
-        string key = SourceKey.ToString();
-        Services.AddHealthChecks().AddCheck<TCheck>(key, status, ["source", key], timeout ?? TimeSpan.FromSeconds(8));
-    }
+    public void AddHealthCheck<TCheck>(HealthStatus status = HealthStatus.Degraded) where TCheck : class, IHealthCheck =>
+        Services.AddHealthChecks().AddCheck<TCheck>(SourceKey, status, ["source", SourceKey], TimeSpan.FromSeconds(8));
 }

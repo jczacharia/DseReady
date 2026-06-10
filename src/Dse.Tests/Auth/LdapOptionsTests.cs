@@ -25,12 +25,14 @@ public sealed class LdapOptionsTests(ITestOutputHelper toh, TestFixture fixture)
         LdapAuthOptions oud = Monitor.Get("Oud");
 
         ad.Host.Should().Be("ad.dse.test");
-        ad.SearchBase.Should().Be("DC=ad,DC=dse,DC=test");
+        ad.SearchBase.Should().Be("DC=pncbank,DC=com");
         ad.GroupsAttribute.Should().Be("memberOf");
+        ad.GroupsFilter.Should().Be("(&(objectClass=user)(!(objectClass=computer))(sAMAccountName={0}))");
 
         oud.Host.Should().Be("oud.dse.test");
-        oud.SearchBase.Should().Be("o=dse-oud");
-        oud.GroupsAttribute.Should().Be("groupMembership");
+        oud.SearchBase.Should().Be("o=pnc");
+        oud.GroupsAttribute.Should().Be("memberOf");
+        oud.GroupsFilter.Should().Be("(uid={0})");
 
         // The whole point of named options: the two sections do not bleed into each other.
         ad.Host.Should().NotBe(oud.Host);

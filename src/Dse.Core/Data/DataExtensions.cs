@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using Gridify;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +12,6 @@ using Wolverine.EntityFrameworkCore;
 
 namespace Dse.Data;
 
-[ExcludeFromCodeCoverage]
 public static class DataExtensions
 {
     public static string GetSqliteConnectionString(this IConfiguration configuration) =>

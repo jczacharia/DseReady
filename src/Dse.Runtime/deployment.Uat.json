@@ -1,7 +1,4 @@
 {
-    "Dse": {
-        "Environment": "Uat"
-    },
     "OpenApi": {
         "ExternalBaseUrl": "https://search-uat.pncint.net/adv/api"
     },

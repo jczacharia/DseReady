@@ -13,14 +13,13 @@ public static class FluentOptions
         where TOptions : class
         where TValidator : class, IValidator<TOptions>
     {
-        builder.Services.AddScoped<TValidator>();
-        builder.Services.AddScoped<IValidator<TOptions>>(sp => sp.GetRequiredService<TValidator>());
+        builder.Services.AddScoped<IValidator<TOptions>, TValidator>();
         builder.Services.AddSingleton<IValidateOptions<TOptions>>(sp => new FluentValidateOptions<TOptions>(sp, builder.Name));
         return builder;
     }
 
-    private sealed class FluentValidateOptions<TOptions>(IServiceProvider sp, string? optionsName)
-        : IValidateOptions<TOptions> where TOptions : class
+    private sealed class FluentValidateOptions<TOptions>(IServiceProvider sp, string? optionsName) : IValidateOptions<TOptions>
+        where TOptions : class
     {
         public ValidateOptionsResult Validate(string? name, TOptions options)
         {
@@ -33,19 +32,16 @@ public static class FluentOptions
 
             using IServiceScope scope = sp.CreateScope();
 
-            List<string> errors = [];
-            string type = options.GetType().Name;
+            var validator = scope.ServiceProvider.GetRequiredService<IValidator<TOptions>>();
 
-            foreach (IValidator<TOptions> validator in scope.ServiceProvider.GetServices<IValidator<TOptions>>())
+            if (validator.Validate(options) is not { IsValid: false } result)
             {
-                if (validator.Validate(options) is { IsValid: false } result)
-                {
-                    errors.AddRange(result.Errors.Select(e =>
-                        $"Validation for {type}.{e.PropertyName} failed: {e.ErrorMessage}"));
-                }
+                return ValidateOptionsResult.Success;
             }
 
-            return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
+            string type = options.GetType().Name;
+            return ValidateOptionsResult.Fail(result.Errors.Select(failure =>
+                $"Validation failed for {type}.{failure.PropertyName} with the error: {failure.ErrorMessage}"));
         }
     }
 }

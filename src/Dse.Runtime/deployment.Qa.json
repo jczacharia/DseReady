@@ -1,7 +1,4 @@
 {
-    "Dse": {
-        "Environment": "Qa"
-    },
     "OpenApi": {
         "ExternalBaseUrl": "https://search-qa.pncint.net/adv/api"
     },

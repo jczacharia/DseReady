@@ -1,12 +1,13 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using Dse.Shared;
+using Elastic.Channels;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Dse.ES;
 
@@ -18,7 +19,8 @@ public sealed record ElasticStartupData(
 public sealed class ElasticStartupService(
     ILogger<ElasticStartupService> logger,
     ElasticsearchClient client,
-    IConfiguration cfg) : BackgroundService
+    IOptions<ElasticOptions> options,
+    ElasticChangeTokenSource<BufferOptions> changeTokenSource) : BackgroundService
 {
     private const long DefaultBulkMaxByteSize = 100L * 1024 * 1024;
 
@@ -36,6 +38,7 @@ public sealed class ElasticStartupService(
         try
         {
             _data = await ProbeClusterAsync(stoppingToken);
+            changeTokenSource.TriggerReload();
             logger.LogInformation("Elasticsearch started successfully");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -93,11 +96,8 @@ public sealed class ElasticStartupService(
             bulkMaxByteSize = DefaultBulkMaxByteSize;
         }
 
-        double nodeUtilization = cfg.GetValue<double?>("DSE_NODE_UTILIZATION") ?? 0.75;
-        double clientOversubscription = cfg.GetValue<double?>("DSE_CLIENT_OVERSUBSCRIPTION") ?? 2.0;
-
-        int clusterCeiling = Math.Max(val1: 2, (int)(writePoolCapacity * nodeUtilization));
-        int clientCeiling = Math.Max(val1: 2, (int)(Environment.ProcessorCount * clientOversubscription));
+        int clusterCeiling = Math.Max(val1: 2, (int)(writePoolCapacity * options.Value.NodeUtilization));
+        int clientCeiling = Math.Max(val1: 2, (int)(Environment.ProcessorCount * options.Value.ClientOversubscription));
 
         int maxChannelConcurrency = Math.Min(clusterCeiling, clientCeiling);
 
@@ -107,8 +107,8 @@ public sealed class ElasticStartupService(
             + "clientCeiling={ClientCeiling} (×{ClientOversubscription}, cores={Cores}), "
             + "→ maxChannelConcurrency={MaxChannelConcurrency}, bulkMaxByteSize={BulkMaxByteSize:N0}",
             dataNodeCount, writePoolCapacity,
-            clusterCeiling, nodeUtilization,
-            clientCeiling, clientOversubscription, Environment.ProcessorCount,
+            clusterCeiling, options.Value.NodeUtilization,
+            clientCeiling, options.Value.ClientOversubscription, Environment.ProcessorCount,
             maxChannelConcurrency, bulkMaxByteSize);
 
         return new ElasticStartupData(maxChannelConcurrency, bulkMaxByteSize, dataNodeCount);

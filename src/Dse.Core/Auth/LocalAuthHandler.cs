@@ -4,9 +4,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
-using Dse.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,6 +19,7 @@ public sealed class LocalAuthOptions : AuthenticationSchemeOptions
 
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public bool UseLdapConnectors { get; set; } = true;
     public string[] Roles { get; set; } = [];
 }
 
@@ -35,9 +36,12 @@ public sealed class LocalAuthHandler(
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, Options.Username));
         identity.AddClaims(Options.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
-        foreach (LdapConnector connector in connectors)
+        if (Options.UseLdapConnectors)
         {
-            await connector.AddMembershipsClaims(identity, Options.Username).ConfigureAwait(false);
+            foreach (LdapConnector connector in connectors)
+            {
+                await connector.AddMembershipsClaims(identity, Options.Username).ConfigureAwait(false);
+            }
         }
 
         ClaimsPrincipal principal = new(identity);
@@ -51,20 +55,20 @@ public static class LocalAuthExtensions
     public static AuthenticationBuilder AddLocalAuthentication(this AuthenticationBuilder builder)
     {
         builder.Services
-            .AddOptions<LocalAuthOptions>()
-            .PostDseConfigure((options, dse) =>
+            .AddOptions<LocalAuthOptions>(LocalAuthOptions.SchemeName)
+            .BindConfiguration(DseOptions.SectionName)
+            .BindConfiguration(LocalAuthOptions.SchemeName)
+            .Configure<IHostEnvironment>((options, env) =>
             {
-                if (dse.LocalCredentials() is { } local)
+                if (env.IsProduction())
                 {
-                    options.Username = local.Username;
-                    options.Password = local.Password;
-                    options.Roles = local.Roles;
-                }
-                else
-                {
+                    options.Username = string.Empty;
+                    options.Password = string.Empty;
+                    options.Roles = [];
                     options.ForwardDefault = PingOptions.SchemeName;
                 }
             });
-        return builder.AddScheme<LocalAuthOptions, LocalAuthHandler>(LocalAuthOptions.SchemeName, configureOptions: null);
+        builder.AddScheme<LocalAuthOptions, LocalAuthHandler>(LocalAuthOptions.SchemeName, configureOptions: null);
+        return builder;
     }
 }

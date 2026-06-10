@@ -60,7 +60,7 @@ public static class IngestionOverviewEndpoint
                 CancellationToken ct) =>
             {
                 List<SourceIngestionStatus> sources = [];
-                foreach (SourceModule module in modules.OrderBy(m => m.SourceKey.ToString(), StringComparer.Ordinal))
+                foreach (SourceModule module in modules.OrderBy(m => (string)m.SourceKey, StringComparer.Ordinal))
                 {
                     SourceKey key = module.SourceKey;
 

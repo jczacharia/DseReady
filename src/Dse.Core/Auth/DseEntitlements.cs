@@ -1,8 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
-
 namespace Dse.Auth;
 
 public static class DseEntitlements

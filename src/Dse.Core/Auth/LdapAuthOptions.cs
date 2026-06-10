@@ -1,7 +1,6 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
-using System.Diagnostics.CodeAnalysis;
 using Dse.Shared;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace Dse.Auth;
 
-[ExcludeFromCodeCoverage]
 public sealed class LdapAuthOptions
 {
     public string Host { get; set; } = string.Empty;
@@ -41,7 +39,6 @@ public sealed class LdapAuthOptionsValidator : AbstractValidator<LdapAuthOptions
     }
 }
 
-[ExcludeFromCodeCoverage]
 public static class LdapAuthExtensions
 {
     public static OptionsBuilder<LdapAuthOptions> AddLdapAuth(this IServiceCollection services, string key)
@@ -49,8 +46,7 @@ public static class LdapAuthExtensions
         services.AddKeyedSingleton<LdapConnector>(key, (sp, _) => new LdapConnector(key, sp));
         services.AddSingleton<LdapConnector>(sp => sp.GetRequiredKeyedService<LdapConnector>(key));
 
-        services
-            .AddHealthChecks()
+        services.AddHealthChecks()
             .Add(new HealthCheckRegistration($"ldap-{key.ToLowerInvariant()}",
                 sp => new LdapHealthCheck(
                     sp.GetRequiredKeyedService<LdapConnector>(key),
@@ -61,6 +57,7 @@ public static class LdapAuthExtensions
 
         return services
             .AddOptions<LdapAuthOptions>(key)
+            .BindConfiguration("Ldap")
             .BindConfiguration($"Ldap:{key}")
             .ValidateOnStart()
             .WithFluentValidator<LdapAuthOptions, LdapAuthOptionsValidator>();

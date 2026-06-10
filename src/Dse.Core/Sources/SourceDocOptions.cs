@@ -28,7 +28,7 @@ public static class SourceDocOptionsExtensions
     private const string DelimiterFilter = "delimiter";
 
     public static AnalysisBuilder DseAnalysis(this AnalysisBuilder analysis) => analysis
-        .TokenFilter("front_ngram", f => f.EdgeNGram().MinGram(2).MaxGram(12))
+        .TokenFilter("front_ngram", f => f.EdgeNGram().MinGram(1).MaxGram(12))
         .TokenFilter("bigram_joiner", f => f.Shingle().MaxShingleSize(2).TokenSeparator("").OutputUnigrams(false))
         .TokenFilter("bigram_joiner_unigrams", f => f.Shingle().MaxShingleSize(2).TokenSeparator("").OutputUnigrams(true))
         .TokenFilter("bigram_max_size", f => f.Length().Min(0).Max(16))

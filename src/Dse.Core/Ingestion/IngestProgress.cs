@@ -38,6 +38,8 @@ public enum IngestCheckpoint
 /// </summary>
 public sealed class IngestProgress : Entity<Guid>, IDisposable
 {
+    private IngestProgress() { }
+    public IngestProgress(Guid id) : base(id) { }
     public IngestCheckpoint Checkpoint { get; init; } = IngestCheckpoint.Queued;
     public JsonDocument Metadata { get; init; } = JsonDocument.Parse("{}");
 
@@ -65,12 +67,10 @@ public sealed class IngestProgress : Entity<Guid>, IDisposable
         Checkpoint == IngestCheckpoint.Faulted ||
         Checkpoint == IngestCheckpoint.Succeeded;
 
-    public override Guid Id { get; init; } = Guid.NewGuid();
-
     public void Dispose() => Metadata.Dispose();
 
     /// <summary>A checkpoint carrying no live counters — for control-plane transitions (cancel, interrupt, ...).</summary>
-    public static IngestProgress At(IngestCheckpoint checkpoint, object? metadata = null) => new()
+    public static IngestProgress At(IngestCheckpoint checkpoint, object? metadata = null) => new(Guid.NewGuid())
     {
         Checkpoint = checkpoint,
         Metadata = metadata is null ? JsonDocument.Parse("{}") : JsonSerializer.SerializeToDocument(metadata, JsonDefaults.Web),
