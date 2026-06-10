@@ -32,10 +32,29 @@ ARG AGENT_PROXYURL
 
 # Install the SeaLights .NET Core agent (glibc/RHEL 8 build) into /sealights.
 # Provides libSL.DotNet.ProfilerLib.Linux.so referenced by the CORECLR_* paths above.
+#
+# TLS verification is disabled (-k/--proxy-insecure): the corporate VPN proxy intercepts TLS with a CA
+# the agent worker doesn't trust and has no cert store (or openssl) to add it to. This is an internal
+# download over the trusted VPN. If a corporate CA .crt is ever available, prefer pinning it with
+# `--cacert <file>` (no openssl required) instead of skipping verification.
+# Verbose, with a non-fatal probe, so a failure at this ~30-min-in step shows the proxy value, DNS, and
+# the exact connect/TLS point of failure instead of a bare "curl: (35)". All curl flags are RHEL8-curl
+# (7.61) safe. Trim the diagnostics once the build is reliably reaching the network.
 RUN mkdir -p /sealights/logs && \
     proxy="${HTTPS_PROXY:-${AGENT_PROXYURL}}" && \
-    curl -fsSL ${proxy:+--proxy "$proxy"} -o /tmp/sl-agent.tar.gz \
-      https://agents.sealights.co/dotnetcore/latest/sealights-dotnet-agent-linux-self-contained.tar.gz && \
+    url="https://agents.sealights.co/dotnetcore/latest/sealights-dotnet-agent-linux-self-contained.tar.gz" && \
+    echo "===== sealights agent download diagnostics =====" && \
+    echo "[sl] HTTPS_PROXY=[${HTTPS_PROXY}] AGENT_PROXYURL=[${AGENT_PROXYURL}] -> effective proxy=[${proxy}]" && \
+    curl --version | head -1 && \
+    echo "[sl] DNS agents.sealights.co:" && (getent hosts agents.sealights.co || echo "[sl] !! DNS lookup FAILED") && \
+    echo "[sl] connectivity probe (non-fatal):" && \
+    ( curl -sS -I -m 25 --insecure --proxy-insecure ${proxy:+--proxy "$proxy"} \
+        -w '[sl] probe -> http=%{http_code} time=%{time_total}s\n' "$url" ; \
+      echo "[sl] probe curl exit=$?" ) && \
+    echo "[sl] downloading (verbose):" && \
+    curl -v -fSL --connect-timeout 15 --max-time 300 --retry 3 --retry-delay 5 --retry-connrefused \
+      --insecure --proxy-insecure ${proxy:+--proxy "$proxy"} -o /tmp/sl-agent.tar.gz "$url" && \
+    ls -l /tmp/sl-agent.tar.gz && \
     tar -xzf /tmp/sl-agent.tar.gz --directory /sealights && \
     rm /tmp/sl-agent.tar.gz
 

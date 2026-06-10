@@ -15,8 +15,8 @@ public sealed class LdapAuthOptions
     public string Host { get; set; } = string.Empty;
     public int Port { get; set; } = 636;
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(5);
-    public string BindDn { get; set; } = string.Empty;
-    public string BindPassword { get; set; } = string.Empty;
+    public string? BindDn { get; set; }
+    public string? BindPassword { get; set; }
     public string SearchBase { get; set; } = string.Empty;
     public string GroupsFilter { get; set; } = string.Empty;
     public string GroupsAttribute { get; set; } = string.Empty;
@@ -29,8 +29,6 @@ public sealed class LdapAuthOptionsValidator : AbstractValidator<LdapAuthOptions
         RuleFor(o => o.Host).NotEmpty();
         RuleFor(o => o.Port).InclusiveBetween(from: 1, to: 65535);
         RuleFor(o => o.ConnectionTimeout).GreaterThan(TimeSpan.Zero);
-        RuleFor(o => o.BindDn).NotEmpty();
-        RuleFor(o => o.BindPassword).NotEmpty();
         RuleFor(o => o.SearchBase).NotEmpty();
         RuleFor(o => o.GroupsFilter)
             .NotEmpty()
