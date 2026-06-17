@@ -1,28 +1,7 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
-//
-// Confluence ingest bottleneck probe.
-//
-// The crawl pipeline has three stages in series:
-//
-//     Confluence read  ->  client CPU (JSON parse + HTML clean)  ->  Elasticsearch write
-//
-// This probe measures each stage independently so you can see which one is the wall:
-//   * READ side  : per-page network time vs. parse time  (Confluence-bound vs. CPU-bound)
-//   * WRITE side : ingestion is always ON (real IngestChannel) — but it never promotes an alias,
-//                  so the throwaway index is simply deleted afterwards. The probe measures how long
-//                  the producer spends BLOCKED by back-pressure. High block => Elasticsearch is the
-//                  bottleneck; ~zero block => the read side is.
-//
-// Back-pressure ordering (mirrors ConfluenceIngest): the channel WaitToWrite gate runs BEFORE each
-// Confluence request, so when ES is behind we stop fetching instead of piling pages up in memory.
-//
-// Deliberately NOT using the production resilience pipeline (Polly retries would distort raw
-// latency) nor the post-configure/IngestionProfile layer (explicit BufferOptions below instead).
-//
-// Run:  dotnet run --project src/Dse.Probes -c Release
-// Connection settings come from appsettings.json + user-secrets ("dse") + env vars.
-// The knobs you actually want to sweep are all in TUNING, right here:
 
+
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
@@ -40,31 +19,52 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 // ───────────────────────────── TUNING — sweep these ─────────────────────────────
-const int CrawlConcurrency = 64;     // concurrent Confluence search requests
-const int PageSize = 50;             // results per search page (Confluence caps body-expanded at 50)
-const long MaxDocs = 5_000;          // cap the probe run for fast iteration; 0 = whole corpus
+const int CrawlConcurrency = 64; // concurrent Confluence searches — SWEEP 16/64/128/256 to find the ceiling
+const int PageSize = 50; // results per page (server caps body-expanded at 50) — SWEEP to expose fixed per-request overhead
+const long MaxDocs = 5_000; // cap for fast iteration; use >= CrawlConcurrency*PageSize*5 for a true ceiling; 0 = whole corpus
+const long StartOffset = 0; // page from here — set high (e.g. 400_000) to measure DEEP-pagination cost
 const string ContentCql = "type in (page,blogpost) order by lastModified desc";
 
+// The expand set is the prime throughput lever: each expansion is rendered per result, server-side.
+// Drop entries (especially body.storage) and re-run to measure the win.
+string[] Expand = ["ancestors", "body.storage", "history", "metadata.labels", "space", "version"];
+
 const string ProbeIndex = "confluence-probe"; // throwaway target index; no alias promoted, safe to delete afterwards
-const int ExportMaxItems = 5_000;    // BufferOptions.OutboundBufferMaxSize (docs per bulk)
+const int ExportMaxItems = 5_000; // BufferOptions.OutboundBufferMaxSize (docs per bulk)
 const long ExportMaxBytes = 10L * 1024 * 1024; // BufferOptions.OutboundBufferMaxBytes (byte budget per bulk)
-const int ExportConcurrency = 8;     // BufferOptions.ExportMaxConcurrency (concurrent bulk requests)
+const int ExportConcurrency = 8; // BufferOptions.ExportMaxConcurrency (concurrent bulk requests)
 // ─────────────────────────────────────────────────────────────────────────────────
 
-HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+var configManager = new ConfigurationManager();
+configManager.AddEnvironmentVariables().AddUserSecrets("dse");
+
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    ApplicationName = "Dse.Probes",
+    Args = args,
+    Configuration = configManager,
+});
 IConfiguration config = builder.Configuration;
 IHostEnvironment env = builder.Environment;
 
 using ILoggerFactory loggerFactory = LoggerFactory.Create(b => b
     .AddConfiguration(config.GetSection("Logging"))
-    .AddSimpleConsole(o => { o.SingleLine = true; o.TimestampFormat = "HH:mm:ss "; }));
+    .AddSimpleConsole(o =>
+    {
+        o.SingleLine = true;
+        o.TimestampFormat = "HH:mm:ss ";
+    }));
 ILogger log = loggerFactory.CreateLogger("ConfluenceProbe");
 
 ConfluenceOptions confluence = config.GetSection("Confluence").Get<ConfluenceOptions>() ?? new ConfluenceOptions();
 ElasticOptions elastic = config.GetSection("Elastic").Get<ElasticOptions>() ?? new ElasticOptions();
 
 using var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
 CancellationToken ct = cts.Token;
 
 var m = new Metrics();
@@ -95,27 +95,31 @@ if (confluence is { Username.Length: > 0, Password.Length: > 0 })
 }
 
 string cql = Uri.EscapeDataString(ContentCql);
-string expand = Uri.EscapeDataString(string.Join(',', confluence.ContentExpand));
+string expand = Uri.EscapeDataString(string.Join(separator: ',', Expand));
 
-async Task<ConfluenceSearchResponse> FetchAsync(string url, Action<long, long, int>? record, CancellationToken token)
+// record(ttfbTicks, bodyTicks, parseTicks, bytes): server-think vs wire-transfer vs client-CPU.
+async Task<ConfluenceSearchResponse> FetchAsync(string url, Action<long, long, long, int>? record, CancellationToken token)
 {
     var sw = Stopwatch.StartNew();
-    using HttpResponseMessage resp = await http.GetAsync(url, token);
+    using HttpResponseMessage resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+    long ttfbTicks = sw.ElapsedTicks; // request accepted -> response headers = Confluence server processing
     resp.EnsureSuccessStatusCode();
+
+    sw.Restart();
     byte[] bytes = await resp.Content.ReadAsByteArrayAsync(token);
-    long networkTicks = sw.ElapsedTicks;
+    long bodyTicks = sw.ElapsedTicks; // body download (+ decompression) = wire/bandwidth
 
     sw.Restart();
     ConfluenceSearchResponse page = JsonSerializer.Deserialize<ConfluenceSearchResponse>(
         bytes, ConfluenceDocJsonConverter.JsonSerializerOptions) ?? throw new InvalidOperationException("null response");
-    long parseTicks = sw.ElapsedTicks;
+    long parseTicks = sw.ElapsedTicks; // deserialize + HTML clean = client CPU
 
-    record?.Invoke(networkTicks, parseTicks, bytes.Length);
+    record?.Invoke(ttfbTicks, bodyTicks, parseTicks, bytes.Length);
     return page;
 }
 
 // ── How many docs to crawl ──
-ConfluenceSearchResponse head = await FetchAsync($"/rest/api/content/search?cql={cql}&start=0&limit=0", null, ct);
+ConfluenceSearchResponse head = await FetchAsync($"/rest/api/content/search?cql={cql}&start=0&limit=0", record: null, ct);
 long total = MaxDocs > 0 ? Math.Min(MaxDocs, head.TotalSize) : head.TotalSize;
 log.LogInformation("Cluster reports {Total} matching docs; probing {Probe}", head.TotalSize, total);
 if (total == 0)
@@ -132,14 +136,17 @@ if (elastic.Username is { Length: > 0 } eu && elastic.Password is { Length: > 0 
 {
     settings = settings.Authentication(new BasicAuthentication(eu, ep));
 }
+
 if (!string.IsNullOrWhiteSpace(elastic.CertificateFingerprint))
 {
     settings = settings.CertificateFingerprint(elastic.CertificateFingerprint);
 }
+
 if (elastic.AllowUntrustedCertificates)
 {
     settings = settings.ServerCertificateValidationCallback(static (_, _, _, _) => true);
 }
+
 if (elastic.EnableHttpCompression)
 {
     settings = settings.EnableHttpCompression();
@@ -147,7 +154,7 @@ if (elastic.EnableHttpCompression)
 
 var esClient = new ElasticsearchClient(settings);
 var channel = new IngestChannel<ConfluenceDoc>(new IngestChannelOptions<ConfluenceDoc>(
-    esClient.Transport, new Confluence().GetTypeContext(env), DateTimeOffset.UtcNow, indexNameOverride: ProbeIndex)
+    esClient.Transport, new Confluence().GetTypeContext(env), DateTimeOffset.UtcNow, ProbeIndex)
 {
     BufferOptions = new BufferOptions
     {
@@ -170,6 +177,7 @@ var channel = new IngestChannel<ConfluenceDoc>(new IngestChannelOptions<Confluen
         {
             errors++;
         }
+
         if (errors > 0)
         {
             Interlocked.Add(ref m.WriteErrors, errors);
@@ -197,8 +205,8 @@ Task reporter = Task.Run(async () =>
 }, ct);
 
 // ── The crawl: offset-paged, mirrors today's ConfluenceIngest ──
-var partitions = System.Collections.Concurrent.Partitioner
-    .Create(0L, total, PageSize)
+IEnumerable<(long Start, long Limit)> partitions = Partitioner
+    .Create(StartOffset, StartOffset + total, PageSize)
     .GetDynamicPartitions()
     .Select(p => (Start: p.Item1, Limit: p.Item2 - p.Item1));
 
@@ -218,17 +226,30 @@ try
                 log.LogWarning("Partition {Start}-{Limit} skipped waiting for channel", part.Start, part.Limit);
                 return;
             }
+
             long blockedTicks = gate.ElapsedTicks;
 
             string url = $"/rest/api/content/search?cql={cql}&start={part.Start}&limit={part.Limit}&expand={expand}";
-            ConfluenceSearchResponse page = await FetchAsync(url, (net, parse, bytes) =>
+            ConfluenceSearchResponse page;
+            try
             {
-                Interlocked.Add(ref m.NetworkTicks, net);
-                Interlocked.Add(ref m.ParseTicks, parse);
-                Interlocked.Add(ref m.BytesRead, bytes);
-                Interlocked.Increment(ref m.Pages);
-                m.NetworkMs.Add(Stopwatch.GetElapsedTime(0, net).TotalMilliseconds);
-            }, token);
+                page = await FetchAsync(url, (ttfb, body, parse, bytes) =>
+                {
+                    Interlocked.Add(ref m.TtfbTicks, ttfb);
+                    Interlocked.Add(ref m.BodyTicks, body);
+                    Interlocked.Add(ref m.ParseTicks, parse);
+                    Interlocked.Add(ref m.BytesRead, bytes);
+                    Interlocked.Increment(ref m.Pages);
+                    m.TtfbMs.Add(Stopwatch.GetElapsedTime(startingTimestamp: 0, ttfb).TotalMilliseconds);
+                }, token);
+            }
+            catch (HttpRequestException ex)
+            {
+                // Count, don't crash — a 429/503 here is the signal that Confluence is saturated/rate-limiting.
+                Interlocked.Increment(ref m.FetchErrors);
+                log.LogWarning("Fetch failed at start={Start}: {Status} {Message}", part.Start, ex.StatusCode, ex.Message);
+                return;
+            }
 
             Interlocked.Add(ref m.DocsRead, page.Results.Count);
 
@@ -256,58 +277,82 @@ finally
 // ── Summary + verdict ──
 double wallSec = totalSw.Elapsed.TotalSeconds;
 double readPerSec = m.DocsRead / wallSec;
-double avgNetMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(0, m.NetworkTicks).TotalMilliseconds / m.Pages;
-double avgParseMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(0, m.ParseTicks).TotalMilliseconds / m.Pages;
-double p95NetMs = Percentile(m.NetworkMs, 0.95);
+double avgServerMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.TtfbTicks).TotalMilliseconds / m.Pages;
+double avgTransferMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.BodyTicks).TotalMilliseconds / m.Pages;
+double avgParseMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.ParseTicks).TotalMilliseconds / m.Pages;
+double bytesPerDoc = m.DocsRead == 0 ? 0 : (double)m.BytesRead / m.DocsRead;
+
+var proc = Process.GetCurrentProcess();
+proc.Refresh();
 
 Console.WriteLine();
 Console.WriteLine("──────────────── PROBE SUMMARY ────────────────");
 Console.WriteLine($"  wall time        : {wallSec:F1}s");
 Console.WriteLine($"  docs read        : {m.DocsRead}  ({readPerSec:F0}/s)");
-Console.WriteLine($"  bytes read       : {m.BytesRead / 1024.0 / 1024.0:F1} MiB  ({m.BytesRead / 1024.0 / 1024.0 / wallSec:F1} MiB/s)");
-Console.WriteLine($"  pages            : {m.Pages}");
-Console.WriteLine($"  per page         : network avg {avgNetMs:F0}ms (p95 {p95NetMs:F0}ms) | parse avg {avgParseMs:F1}ms");
+Console.WriteLine(
+    $"  bytes read       : {m.BytesRead / 1024.0 / 1024.0:F1} MiB  ({m.BytesRead / 1024.0 / 1024.0 / wallSec:F1} MiB/s) | {bytesPerDoc / 1024.0:F1} KiB/doc");
+Console.WriteLine($"  pages            : {m.Pages}  (fetch errors {m.FetchErrors})");
+Console.WriteLine(
+    $"  per page         : server(TTFB) avg {avgServerMs:F0}ms | transfer avg {avgTransferMs:F0}ms | parse avg {avgParseMs:F1}ms");
+Console.WriteLine(
+    $"  server(TTFB) dist: p50 {Percentile(m.TtfbMs, p: 0.50):F0}ms  p95 {Percentile(m.TtfbMs, p: 0.95):F0}ms  p99 {Percentile(m.TtfbMs, p: 0.99):F0}ms  max {Percentile(m.TtfbMs, p: 1.0):F0}ms");
+Console.WriteLine(
+    $"  peak memory      : {proc.PeakWorkingSet64 / 1024 / 1024} MiB working set | {GC.GetTotalAllocatedBytes() / 1024 / 1024} MiB allocated total");
 
 double writePerSec = m.DocsWritten / wallSec;
-double blockSec = Stopwatch.GetElapsedTime(0, m.WriteBlockedTicks).TotalSeconds;
+double blockSec = Stopwatch.GetElapsedTime(startingTimestamp: 0, m.WriteBlockedTicks).TotalSeconds;
 Console.WriteLine($"  docs written     : {m.DocsWritten}  ({writePerSec:F0}/s)  bulks {m.BulkCount}  errors {m.WriteErrors}");
 Console.WriteLine($"  producer blocked : {blockSec:F1}s by back-pressure ({blockSec / wallSec * 100:F0}% of wall)");
 Console.WriteLine(blockSec / wallSec > 0.25
     ? "  VERDICT: Elasticsearch WRITE is the bottleneck (producer spends much of its time blocked on back-pressure)."
     : "  VERDICT: write keeps up — bottleneck is on the READ side, see below.");
-Console.WriteLine(avgNetMs > avgParseMs * 3
-    ? "  READ: dominated by Confluence per-request server time. Sweep CrawlConcurrency: if per-page latency stays flat, Confluence has headroom (more concurrency/pods help); if it balloons, Confluence is saturated (they won't)."
+double readMs = avgServerMs + avgTransferMs;
+Console.WriteLine(readMs > avgParseMs * 3
+    ? avgServerMs > avgTransferMs * 3
+        ? "  READ: Confluence SERVER time (TTFB) dominates — it's compute, not transfer. Trim the Expand set (drop body.storage) and re-run; that's the prime lever."
+        : "  READ: BODY TRANSFER dominates — response size/bandwidth bound. Trimming expansions cuts bytes/doc; gzip is already on."
     : "  READ: parse/CPU time is significant — client CPU (JSON + HTML clean) is a real factor (distributing across pods can help).");
+if (m.FetchErrors > 0)
+{
+    Console.WriteLine(
+        $"  NOTE: {m.FetchErrors} fetch error(s) — likely Confluence rate-limiting/saturation at this concurrency. Back off CrawlConcurrency.");
+}
+
 if (m.Pages < CrawlConcurrency)
 {
-    Console.WriteLine($"  NOTE: only {m.Pages} pages fetched (< CrawlConcurrency {CrawlConcurrency}) — concurrency was STARVED; raise MaxDocs (≥ {CrawlConcurrency * PageSize * 5}) to measure the true throughput ceiling.");
+    Console.WriteLine(
+        $"  NOTE: only {m.Pages} pages fetched (< CrawlConcurrency {CrawlConcurrency}) — concurrency was STARVED; raise MaxDocs (≥ {CrawlConcurrency * PageSize * 5}) to measure the true throughput ceiling.");
 }
+
 Console.WriteLine("────────────────────────────────────────────────");
 
 return;
 
-static double Percentile(System.Collections.Concurrent.ConcurrentBag<double> samples, double p)
+static double Percentile(ConcurrentBag<double> samples, double p)
 {
     double[] sorted = [.. samples];
     if (sorted.Length == 0)
     {
         return 0;
     }
+
     Array.Sort(sorted);
-    int idx = Math.Clamp((int)Math.Ceiling(p * sorted.Length) - 1, 0, sorted.Length - 1);
+    int idx = Math.Clamp((int)Math.Ceiling(p * sorted.Length) - 1, min: 0, sorted.Length - 1);
     return sorted[idx];
 }
 
 internal sealed class Metrics
 {
-    public long DocsRead;
-    public long BytesRead;
-    public long Pages;
-    public long NetworkTicks;
-    public long ParseTicks;
-    public long DocsWritten;
+    public readonly ConcurrentBag<double> TtfbMs = [];
+    public long BodyTicks; // body transfer + decompression
     public long BulkCount;
-    public long WriteErrors;
+    public long BytesRead;
+    public long DocsRead;
+    public long DocsWritten;
+    public long FetchErrors; // non-2xx / transport failures (saturation / rate-limit signal)
+    public long Pages;
+    public long ParseTicks; // deserialize + HTML clean (client CPU)
+    public long TtfbTicks; // Confluence server-think time
     public long WriteBlockedTicks;
-    public readonly System.Collections.Concurrent.ConcurrentBag<double> NetworkMs = [];
+    public long WriteErrors;
 }
