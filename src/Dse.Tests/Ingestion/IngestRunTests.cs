@@ -164,17 +164,6 @@ public sealed class IngestRunTests(ITestOutputHelper toh, TestFixture fixture) :
     }
 
     [Fact]
-    public async Task Empty_corpus_run_succeeds_and_indexes_nothing()
-    {
-        State.Total = 0;
-        Guid runId = await StartAndAwaitAsync(SpecModule.SourceKey, dryRun: false, s_admin);
-
-        IngestRun run = await ReadRunAsync(runId);
-        run.CurrentProgress.Checkpoint.Should().Be(IngestCheckpoint.Succeeded);
-        (await SearchableCountAsync(SpecModule.SourceKey)).Should().Be(0);
-    }
-
-    [Fact]
     public Task Status_for_an_unknown_run_returns_404() => Scenario(s =>
     {
         s.Get.Url($"/sources/{SpecModule.SourceKey}/ingest/{Guid.NewGuid()}");

@@ -2,6 +2,7 @@
 
 
 using Dse.Ingestion;
+using Dse.Shared;
 using Elastic.Channels;
 using Elastic.Mapping;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,10 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
         Services.AddSingleton(module.SourceKey);
         Services.AddKeyedSingleton(module.SourceKey, module);
         Services.AddOptions<BufferOptions>(SourceKey).BindConfiguration(SourceKey);
+        Services.AddOptions<IngestionProfile>(SourceKey)
+            .BindConfiguration($"{SourceKey}:{IngestionProfile.Section}")
+            .ValidateOnStart()
+            .WithFluentValidator<IngestionProfile, IngestionProfileValidator>();
         Services.AddKeyedSingleton<ElasticsearchTypeContext>(module.SourceKey, (sp, _) =>
         {
             var env = sp.GetRequiredService<IHostEnvironment>();
@@ -52,8 +57,6 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
 
     public OptionsBuilder<TOptions> AddOptions<TOptions>() where TOptions : class =>
         Services.AddOptions<TOptions>().BindConfiguration(SourceKey).ValidateDataAnnotations().ValidateOnStart();
-
-    public OptionsBuilder<BufferOptions> ConfigureBufferOptions() => Services.AddOptions<BufferOptions>(SourceKey);
 
     public void AddIngestion<TIngest>() where TIngest : class, IIngest<TDoc>
     {

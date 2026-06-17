@@ -8,9 +8,7 @@ using Dse.Sources;
 using Dse.Sources.Confluence;
 using Elastic.Mapping;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Wolverine.Attributes;
 
 [assembly: SourceManifest<Confluence>]
@@ -113,7 +111,6 @@ public sealed class Confluence() : SourceModule<ConfluenceDoc>("confluence")
         builder.Services.AddConfluenceHttpClients();
         builder.AddHealthCheck<ConfluenceHealthCheck>();
         builder.AddIngestion<ConfluenceIngest>();
-        builder.ConfigureBufferOptions().BindConfiguration(SourceKey);
     }
 
     public override void Configure(SourcePipelineBuilder builder)

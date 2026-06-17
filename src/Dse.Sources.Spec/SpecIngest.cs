@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using Dse.Ingestion;
-using Elastic.Channels;
 
 namespace Dse.Sources.Spec;
 
@@ -41,8 +40,6 @@ public sealed class SpecIngest(SpecState state) : IIngest<SpecDoc>
             await context.WriteDocAsync(NewDoc(i), cancellationToken).ConfigureAwait(false);
         }
     }
-
-    public void ConfigureBufferOptions(BufferOptions bufferOptions) => bufferOptions.OutboundBufferMaxSize = 250;
 
     private static SpecDoc NewDoc(long i) => new()
     {
