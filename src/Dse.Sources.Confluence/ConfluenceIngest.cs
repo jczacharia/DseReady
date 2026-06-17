@@ -51,6 +51,12 @@ public sealed class ConfluenceIngest(
             },
             async (part, ct) =>
             {
+                // Back-pressure gate — this MUST be the first thing in the partition body, before the
+                // Confluence request below. WaitToWriteDocAsync blocks while the export channel is full
+                // (i.e. Elasticsearch is behind). Gating the fetch here means we stop pulling pages from
+                // Confluence when we can't write them, so fetched ConfluenceDocs can't pile up unbounded
+                // in memory. Checking AFTER the request would defeat this: the page would already be
+                // downloaded and sitting in memory before we ever discover the channel was full.
                 if (!await context.WaitToWriteDocAsync(ct).ConfigureAwait(false))
                 {
                     logger.LogWarning("Partition {Start}-{End} skipped waiting for channel", part.Start, part.End);

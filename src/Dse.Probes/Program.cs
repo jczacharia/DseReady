@@ -8,9 +8,13 @@
 //
 // This probe measures each stage independently so you can see which one is the wall:
 //   * READ side  : per-page network time vs. parse time  (Confluence-bound vs. CPU-bound)
-//   * WRITE side : optional — pushes docs through the real IngestChannel and measures how
-//                  long the producer spends BLOCKED waiting for the channel to accept writes.
-//                  High block time => Elasticsearch is the bottleneck. ~Zero => read is.
+//   * WRITE side : ingestion is always ON (real IngestChannel) — but it never promotes an alias,
+//                  so the throwaway index is simply deleted afterwards. The probe measures how long
+//                  the producer spends BLOCKED by back-pressure. High block => Elasticsearch is the
+//                  bottleneck; ~zero block => the read side is.
+//
+// Back-pressure ordering (mirrors ConfluenceIngest): the channel WaitToWrite gate runs BEFORE each
+// Confluence request, so when ES is behind we stop fetching instead of piling pages up in memory.
 //
 // Deliberately NOT using the production resilience pipeline (Polly retries would distort raw
 // latency) nor the post-configure/IngestionProfile layer (explicit BufferOptions below instead).
@@ -41,8 +45,7 @@ const int PageSize = 50;             // results per search page (Confluence caps
 const long MaxDocs = 5_000;          // cap the probe run for fast iteration; 0 = whole corpus
 const string ContentCql = "type in (page,blogpost) order by lastModified desc";
 
-const bool WriteToElastic = false;   // false = pure read ceiling (start here). true = full pipeline.
-const string ProbeIndex = "confluence-probe"; // throwaway target index; safe to delete afterwards
+const string ProbeIndex = "confluence-probe"; // throwaway target index; no alias promoted, safe to delete afterwards
 const int ExportMaxItems = 5_000;    // BufferOptions.OutboundBufferMaxSize (docs per bulk)
 const long ExportMaxBytes = 10L * 1024 * 1024; // BufferOptions.OutboundBufferMaxBytes (byte budget per bulk)
 const int ExportConcurrency = 8;     // BufferOptions.ExportMaxConcurrency (concurrent bulk requests)
@@ -72,8 +75,8 @@ meter.CreateObservableCounter("confluence.docs.written", () => m.DocsWritten);
 meter.CreateObservableCounter("confluence.write.errors", () => m.WriteErrors);
 
 log.LogInformation(
-    "PROBE confluence={Base} crawlConcurrency={Crawl} pageSize={Page} maxDocs={Max} writeToElastic={Write}",
-    confluence.BaseAddress, CrawlConcurrency, PageSize, MaxDocs, WriteToElastic);
+    "PROBE confluence={Base} crawlConcurrency={Crawl} pageSize={Page} maxDocs={Max} index={Index}",
+    confluence.BaseAddress, CrawlConcurrency, PageSize, MaxDocs, ProbeIndex);
 
 // ── Confluence client: explicit, no resilience pipeline so latency is raw ──
 using var handler = new SocketsHttpHandler
@@ -120,65 +123,62 @@ if (total == 0)
     return;
 }
 
-// ── Optional Elasticsearch write path: real IngestChannel, explicit BufferOptions ──
-IngestChannel<ConfluenceDoc>? channel = null;
-if (WriteToElastic)
+// ── Elasticsearch write path: real IngestChannel, explicit BufferOptions. Ingestion is always ON —
+//    we write for real, but never promote an alias, so the throwaway index is simply deleted after. ──
+Uri[] uris = elastic.Endpoints().ToArray();
+NodePool pool = uris.Length == 1 ? new SingleNodePool(uris[0]) : new StaticNodePool(uris);
+var settings = new ElasticsearchClientSettings(pool);
+if (elastic.Username is { Length: > 0 } eu && elastic.Password is { Length: > 0 } ep)
 {
-    Uri[] uris = elastic.Endpoints().ToArray();
-    NodePool pool = uris.Length == 1 ? new SingleNodePool(uris[0]) : new StaticNodePool(uris);
-    var settings = new ElasticsearchClientSettings(pool);
-    if (elastic.Username is { Length: > 0 } eu && elastic.Password is { Length: > 0 } ep)
-    {
-        settings = settings.Authentication(new BasicAuthentication(eu, ep));
-    }
-    if (!string.IsNullOrWhiteSpace(elastic.CertificateFingerprint))
-    {
-        settings = settings.CertificateFingerprint(elastic.CertificateFingerprint);
-    }
-    if (elastic.AllowUntrustedCertificates)
-    {
-        settings = settings.ServerCertificateValidationCallback(static (_, _, _, _) => true);
-    }
-    if (elastic.EnableHttpCompression)
-    {
-        settings = settings.EnableHttpCompression();
-    }
-
-    var esClient = new ElasticsearchClient(settings);
-    channel = new IngestChannel<ConfluenceDoc>(new IngestChannelOptions<ConfluenceDoc>(
-        esClient.Transport, new Confluence().GetTypeContext(env), DateTimeOffset.UtcNow, indexNameOverride: ProbeIndex)
-    {
-        BufferOptions = new BufferOptions
-        {
-            OutboundBufferMaxSize = ExportMaxItems,
-            OutboundBufferMaxBytes = ExportMaxBytes,
-            ExportMaxConcurrency = ExportConcurrency,
-        },
-        ExportItemsAttemptCallback = (retries, count) =>
-        {
-            if (retries == 0)
-            {
-                Interlocked.Add(ref m.DocsWritten, count);
-            }
-        },
-        ExportResponseCallback = (response, _) =>
-        {
-            Interlocked.Increment(ref m.BulkCount);
-            int errors = response.Items?.Count(i => i.Error is not null) ?? 0;
-            if (response.Error is not null)
-            {
-                errors++;
-            }
-            if (errors > 0)
-            {
-                Interlocked.Add(ref m.WriteErrors, errors);
-            }
-        },
-    });
-
-    await channel.BootstrapElasticsearchAsync(BootstrapMethod.Failure, ct);
-    log.LogInformation("Writing to throwaway index '{Index}' (delete it when done)", ProbeIndex);
+    settings = settings.Authentication(new BasicAuthentication(eu, ep));
 }
+if (!string.IsNullOrWhiteSpace(elastic.CertificateFingerprint))
+{
+    settings = settings.CertificateFingerprint(elastic.CertificateFingerprint);
+}
+if (elastic.AllowUntrustedCertificates)
+{
+    settings = settings.ServerCertificateValidationCallback(static (_, _, _, _) => true);
+}
+if (elastic.EnableHttpCompression)
+{
+    settings = settings.EnableHttpCompression();
+}
+
+var esClient = new ElasticsearchClient(settings);
+var channel = new IngestChannel<ConfluenceDoc>(new IngestChannelOptions<ConfluenceDoc>(
+    esClient.Transport, new Confluence().GetTypeContext(env), DateTimeOffset.UtcNow, indexNameOverride: ProbeIndex)
+{
+    BufferOptions = new BufferOptions
+    {
+        OutboundBufferMaxSize = ExportMaxItems,
+        OutboundBufferMaxBytes = ExportMaxBytes,
+        ExportMaxConcurrency = ExportConcurrency,
+    },
+    ExportItemsAttemptCallback = (retries, count) =>
+    {
+        if (retries == 0)
+        {
+            Interlocked.Add(ref m.DocsWritten, count);
+        }
+    },
+    ExportResponseCallback = (response, _) =>
+    {
+        Interlocked.Increment(ref m.BulkCount);
+        int errors = response.Items?.Count(i => i.Error is not null) ?? 0;
+        if (response.Error is not null)
+        {
+            errors++;
+        }
+        if (errors > 0)
+        {
+            Interlocked.Add(ref m.WriteErrors, errors);
+        }
+    },
+});
+
+await channel.BootstrapElasticsearchAsync(BootstrapMethod.Failure, ct);
+log.LogInformation("Ingesting into throwaway index '{Index}' — no alias is promoted; delete it when done.", ProbeIndex);
 
 // ── Live throughput reporter (per second) ──
 var totalSw = Stopwatch.StartNew();
@@ -208,6 +208,18 @@ try
         new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = CrawlConcurrency },
         async (part, token) =>
         {
+            // CRITICAL: the back-pressure gate is the FIRST thing in the body, BEFORE the Confluence
+            // request. If the channel is full (ES behind), we block here rather than fetch a page we'd
+            // then have to hold in memory. Checking after the fetch would let pages pile up unbounded.
+            // (Mirrors the WaitToWriteDocAsync gate in ConfluenceIngest — see the comment there.)
+            var gate = Stopwatch.StartNew();
+            if (!await channel.WaitToWriteAsync(token).ConfigureAwait(false))
+            {
+                log.LogWarning("Partition {Start}-{Limit} skipped waiting for channel", part.Start, part.Limit);
+                return;
+            }
+            long blockedTicks = gate.ElapsedTicks;
+
             string url = $"/rest/api/content/search?cql={cql}&start={part.Start}&limit={part.Limit}&expand={expand}";
             ConfluenceSearchResponse page = await FetchAsync(url, (net, parse, bytes) =>
             {
@@ -220,32 +232,25 @@ try
 
             Interlocked.Add(ref m.DocsRead, page.Results.Count);
 
-            if (channel is not null)
+            foreach (ConfluenceDoc doc in page.Results)
             {
-                foreach (ConfluenceDoc doc in page.Results)
-                {
-                    var wait = Stopwatch.StartNew();
-                    if (!await channel.WaitToWriteAsync(token).ConfigureAwait(false))
-                    {
-                        return;
-                    }
-                    Interlocked.Add(ref m.WriteBlockedTicks, wait.ElapsedTicks);
-                    await channel.WriteAsync(doc, token).ConfigureAwait(false);
-                }
+                // WriteAsync also applies back-pressure (blocks while full); count that time too.
+                var write = Stopwatch.StartNew();
+                await channel.WriteAsync(doc, token).ConfigureAwait(false);
+                blockedTicks += write.ElapsedTicks;
             }
+
+            Interlocked.Add(ref m.WriteBlockedTicks, blockedTicks);
         });
 
-    if (channel is not null)
-    {
-        log.LogInformation("Draining channel to Elasticsearch...");
-        await channel.WaitForDrainAsync(TimeSpan.FromMinutes(10), ct);
-    }
+    log.LogInformation("Draining channel to Elasticsearch...");
+    await channel.WaitForDrainAsync(TimeSpan.FromMinutes(10), ct);
 }
 finally
 {
     cts.Cancel();
     await reporter.ContinueWith(_ => { }, TaskScheduler.Default);
-    channel?.Dispose();
+    channel.Dispose();
 }
 
 // ── Summary + verdict ──
@@ -262,16 +267,14 @@ Console.WriteLine($"  docs read        : {m.DocsRead}  ({readPerSec:F0}/s)");
 Console.WriteLine($"  bytes read       : {m.BytesRead / 1024.0 / 1024.0:F1} MiB  ({m.BytesRead / 1024.0 / 1024.0 / wallSec:F1} MiB/s)");
 Console.WriteLine($"  pages            : {m.Pages}");
 Console.WriteLine($"  per page         : network avg {avgNetMs:F0}ms (p95 {p95NetMs:F0}ms) | parse avg {avgParseMs:F1}ms");
-if (WriteToElastic)
-{
-    double writePerSec = m.DocsWritten / wallSec;
-    double blockSec = Stopwatch.GetElapsedTime(0, m.WriteBlockedTicks).TotalSeconds;
-    Console.WriteLine($"  docs written     : {m.DocsWritten}  ({writePerSec:F0}/s)  bulks {m.BulkCount}  errors {m.WriteErrors}");
-    Console.WriteLine($"  producer blocked : {blockSec:F1}s waiting on the channel ({blockSec / wallSec * 100:F0}% of wall)");
-    Console.WriteLine(blockSec / wallSec > 0.25
-        ? "  VERDICT: Elasticsearch WRITE is the bottleneck (producer spends much of its time blocked)."
-        : "  VERDICT: write keeps up — bottleneck is on the READ side, see below.");
-}
+
+double writePerSec = m.DocsWritten / wallSec;
+double blockSec = Stopwatch.GetElapsedTime(0, m.WriteBlockedTicks).TotalSeconds;
+Console.WriteLine($"  docs written     : {m.DocsWritten}  ({writePerSec:F0}/s)  bulks {m.BulkCount}  errors {m.WriteErrors}");
+Console.WriteLine($"  producer blocked : {blockSec:F1}s by back-pressure ({blockSec / wallSec * 100:F0}% of wall)");
+Console.WriteLine(blockSec / wallSec > 0.25
+    ? "  VERDICT: Elasticsearch WRITE is the bottleneck (producer spends much of its time blocked on back-pressure)."
+    : "  VERDICT: write keeps up — bottleneck is on the READ side, see below.");
 Console.WriteLine(avgNetMs > avgParseMs * 3
     ? "  READ: dominated by Confluence NETWORK time — the source/server is the wall (more pods won't help)."
     : "  READ: parse/CPU time is significant — client CPU (JSON + HTML clean) is a real factor (distributing across pods can help).");
