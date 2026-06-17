@@ -276,8 +276,12 @@ Console.WriteLine(blockSec / wallSec > 0.25
     ? "  VERDICT: Elasticsearch WRITE is the bottleneck (producer spends much of its time blocked on back-pressure)."
     : "  VERDICT: write keeps up — bottleneck is on the READ side, see below.");
 Console.WriteLine(avgNetMs > avgParseMs * 3
-    ? "  READ: dominated by Confluence NETWORK time — the source/server is the wall (more pods won't help)."
+    ? "  READ: dominated by Confluence per-request server time. Sweep CrawlConcurrency: if per-page latency stays flat, Confluence has headroom (more concurrency/pods help); if it balloons, Confluence is saturated (they won't)."
     : "  READ: parse/CPU time is significant — client CPU (JSON + HTML clean) is a real factor (distributing across pods can help).");
+if (m.Pages < CrawlConcurrency)
+{
+    Console.WriteLine($"  NOTE: only {m.Pages} pages fetched (< CrawlConcurrency {CrawlConcurrency}) — concurrency was STARVED; raise MaxDocs (≥ {CrawlConcurrency * PageSize * 5}) to measure the true throughput ceiling.");
+}
 Console.WriteLine("────────────────────────────────────────────────");
 
 return;
