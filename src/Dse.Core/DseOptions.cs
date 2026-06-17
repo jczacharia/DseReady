@@ -18,14 +18,22 @@ public enum DeploymentEnvironment
     Prod,
 }
 
+/// <summary>Root application settings: resolved deployment target and the stand-in credentials used for local dev.</summary>
 public sealed class DseOptions
 {
     public const string SectionName = "Dse";
     public const string DeploymentEnvVar = "DEPLOYMENT_ENVIRONMENT";
 
+    /// <summary>Resolved deployment environment; set from <see cref="DeploymentEnvVar"/> in production, otherwise <see langword="null"/>.</summary>
     public DeploymentEnvironment? Deployment { get; set; }
+
+    /// <summary>Local-dev username that substitutes for Ping auth; required when running locally.</summary>
     public string? Username { get; set; }
+
+    /// <summary>Password for the local-dev <see cref="Username"/>.</summary>
     public string? Password { get; set; }
+
+    /// <summary>Roles granted to the local-dev user.</summary>
     public string[] Roles { get; set; } = [];
 
     public static bool IsCi() => Environment.GetEnvironmentVariable("CI")?.Trim() switch

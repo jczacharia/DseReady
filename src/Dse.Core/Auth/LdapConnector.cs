@@ -88,7 +88,7 @@ public sealed class LdapConnector(string name, IServiceProvider services) : IDis
     private ValueTask<IReadOnlySet<string>> GetMembershipsAsync(string uid) =>
         new(_cache.GetOrCreateAsync($"{name}:memberships:{uid}", _ => SearchAdAsync(uid), new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+            AbsoluteExpirationRelativeToNow = Options.MembershipCacheTtl,
         })!);
 
     private async Task<IReadOnlySet<string>> SearchAdAsync(string uid)

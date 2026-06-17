@@ -15,26 +15,33 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Dse.Auth;
 
+/// <summary>Configures PingFederate JWT-bearer auth: where the token lives and which claims to read from it.</summary>
 public sealed class PingOptions
 {
     public const string SchemeName = "Ping";
 
+    /// <summary>OIDC discovery document URL used to fetch the issuer's signing keys.</summary>
     [Url]
     [Required]
     public string MetadataAddress { get; set; } = string.Empty;
 
+    /// <summary>Cookie the token is pulled from when the request carries no bearer header.</summary>
     [Required]
     public string CookieName { get; set; } = "PA.APP_DSE";
 
+    /// <summary>Claim carrying caret-separated group memberships, each mapped to a role.</summary>
     [Required]
     public string IsMemberOfClaim { get; set; } = "isMemberOf";
 
+    /// <summary>Claim holding the user id, promoted to the <see cref="System.Security.Claims.ClaimTypes.NameIdentifier"/> and used for LDAP enrichment.</summary>
     [Required]
     public string UidClaim { get; set; } = "uid";
 
+    /// <summary>Outer-token claim whose nested JWT is the real access token to validate.</summary>
     [Required]
     public string AccessTokenClaim { get; set; } = "access_token";
 
+    /// <summary>Response header naming this scheme on a 401 challenge.</summary>
     [Required]
     public string ChallengeHeader { get; set; } = "X-Auth-Challenge";
 }

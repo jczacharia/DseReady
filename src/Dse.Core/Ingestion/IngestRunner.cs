@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Dse.Data;
+using Dse.ES;
 using Dse.Shared;
 using Dse.Sources;
 using Elastic.Channels;
@@ -24,6 +25,7 @@ public sealed class IngestRunner<TDoc>(
     ElasticsearchClient client,
     ILoggerFactory loggerFactory,
     IOptionsMonitor<BufferOptions> bufferOptions,
+    IOptions<ElasticOptions> elasticOptions,
     IServiceProvider services) : IIngestRunner where TDoc : class
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger($"{typeof(TDoc).GetRequiredSourceKey()}Ingestor");
@@ -67,7 +69,7 @@ public sealed class IngestRunner<TDoc>(
 
         try
         {
-            // Claim: moves the run off Queued so a post-crash redelivery is recognized as interrupted, not restarted.
+            // Claim: moves the run-off Queued so a post-crash redelivery is recognized as interrupted, not restarted.
             await AdvanceAsync(run, IngestCheckpoint.Started, ct, new { run.DryRun });
 
             BufferOptions bufOpts = bufferOptions.Get(SourceKey);
@@ -128,7 +130,7 @@ public sealed class IngestRunner<TDoc>(
             await ingest.IngestAsync(context, ct);
 
             await AdvanceAsync(run, IngestCheckpoint.Draining, ct);
-            if (!await channel.WaitForDrainAsync(TimeSpan.FromHours(1), ct))
+            if (!await channel.WaitForDrainAsync(elasticOptions.Value.BulkDrainTimeout, ct))
             {
                 await AdvanceAsync(run, IngestCheckpoint.Failed, ct,
                     new { reason = "Channel timed out while waiting for drain" });

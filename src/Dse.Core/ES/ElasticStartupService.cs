@@ -1,12 +1,14 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 
 
+using Dse.Shared;
 using Elastic.Channels;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.Nodes;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using UnitsNet;
 
 namespace Dse.ES;
 
@@ -23,10 +25,10 @@ public sealed class ElasticStartupService(
 {
     private const long DefaultBulkMaxByteSize = 100L * 1024 * 1024;
 
-    private static readonly ElasticStartupData s_fallbackData =
-        new(Math.Max(val1: 2, Environment.ProcessorCount), DefaultBulkMaxByteSize, DataNodeCount: 0);
-
-    private volatile ElasticStartupData _data = s_fallbackData;
+    // Until the cluster probe completes, fall back to the configured export cap. Ingestion stays inert until the
+    // probe succeeds, so this only governs the brief startup window.
+    private volatile ElasticStartupData _data =
+        new(Math.Max(val1: 2, options.Value.MaxExportConcurrency), DefaultBulkMaxByteSize, DataNodeCount: 0);
 
     public ElasticStartupData Data => _data;
 
@@ -43,8 +45,8 @@ public sealed class ElasticStartupService(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex,
-                "Elasticsearch startup probe failed; continuing with fallback sizing {@FallbackData}. Ingestion will not function until the cluster is reachable",
-                s_fallbackData);
+                "Elasticsearch startup probe failed; continuing with fallback sizing {@FallbackData}."
+                + " Ingestion will not function until the cluster is reachable", _data);
         }
     }
 
@@ -95,20 +97,22 @@ public sealed class ElasticStartupService(
             bulkMaxByteSize = DefaultBulkMaxByteSize;
         }
 
+        // The write pool caps what the cluster can absorb; MaxExportConcurrency caps what a single (possibly
+        // single-core) client can actually drive. The smaller wins. Core count is deliberately not a factor —
+        // this export path is I/O-bound, not CPU-bound.
         int clusterCeiling = Math.Max(val1: 2, (int)(writePoolCapacity * options.Value.NodeUtilization));
-        int clientCeiling = Math.Max(val1: 2, (int)(Environment.ProcessorCount * options.Value.ClientOversubscription));
+        int maxChannelConcurrency = Math.Min(clusterCeiling, Math.Max(val1: 2, options.Value.MaxExportConcurrency));
 
-        int maxChannelConcurrency = Math.Min(clusterCeiling, clientCeiling);
-
-        logger.LogInformation(
-            "Cluster sizing: dataNodes={DataNodes}, writePoolCapacity={WritePool}, "
-            + "clusterCeiling={ClusterCeiling} (×{NodeUtilization}), "
-            + "clientCeiling={ClientCeiling} (×{ClientOversubscription}, cores={Cores}), "
-            + "→ maxChannelConcurrency={MaxChannelConcurrency}, bulkMaxByteSize={BulkMaxByteSize:N0}",
-            dataNodeCount, writePoolCapacity,
-            clusterCeiling, options.Value.NodeUtilization,
-            clientCeiling, options.Value.ClientOversubscription, Environment.ProcessorCount,
-            maxChannelConcurrency, bulkMaxByteSize);
+        logger.LogInformation("Cluster sizing: {@ClusterSizing}", new
+        {
+            dataNodeCount,
+            writePoolCapacity,
+            clusterCeiling,
+            options.Value.NodeUtilization,
+            options.Value.MaxExportConcurrency,
+            maxChannelConcurrency,
+            bulkMaxByteSize = Information.FromBytes(bulkMaxByteSize).Humanize(),
+        });
 
         return new ElasticStartupData(maxChannelConcurrency, bulkMaxByteSize, dataNodeCount);
     }

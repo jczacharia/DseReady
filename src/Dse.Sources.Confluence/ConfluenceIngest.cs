@@ -47,7 +47,7 @@ public sealed class ConfluenceIngest(
         await Parallel.ForEachAsync(partitions, new ParallelOptions
             {
                 CancellationToken = cancellationToken,
-                MaxDegreeOfParallelism = context.MaxConcurrency,
+                MaxDegreeOfParallelism = options.Value.CrawlConcurrency,
             },
             async (part, ct) =>
             {

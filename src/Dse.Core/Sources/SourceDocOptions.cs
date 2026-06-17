@@ -14,9 +14,14 @@ public abstract class SourceDocOptions<TDocument> : IConfigureElasticsearch<TDoc
 
     public abstract MappingsBuilder<TDocument> ConfigureMappings(MappingsBuilder<TDocument> mappings);
 
-    public IReadOnlyDictionary<string, string> IndexSettings =>
-        ConfigureIndexSettings(new Dictionary<string, string> { ["index.highlight.max_analyzed_offset"] = "10000000" })
-            .AsReadOnly();
+    // Per-source mapping value, not an environment dial — override per source via ConfigureIndexSettings.
+    private const string DefaultHighlightMaxAnalyzedOffset = "10_000_000";
+
+    public IReadOnlyDictionary<string, string> IndexSettings => ConfigureIndexSettings(new Dictionary<string, string>
+        {
+            ["index.highlight.max_analyzed_offset"] = DefaultHighlightMaxAnalyzedOffset,
+        })
+        .AsReadOnly();
 
     protected virtual IDictionary<string, string> ConfigureIndexSettings(Dictionary<string, string> settings) => settings;
 }

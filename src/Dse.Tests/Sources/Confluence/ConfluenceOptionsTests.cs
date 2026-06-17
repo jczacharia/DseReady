@@ -18,7 +18,7 @@ public sealed class ConfluenceOptionsTests(ITestOutputHelper toh, TestFixture fi
         BufferOptions options = Services.GetRequiredService<IOptionsMonitor<BufferOptions>>()
             .Get(typeof(ConfluenceOptions).GetRequiredSourceKey());
 
-        options.InboundBufferMaxSize.Should().Be(5000);
-        options.OutboundBufferMaxSize.Should().Be(250);
+        options.InboundBufferMaxSize.Should().Be(48000);
+        options.OutboundBufferMaxSize.Should().Be(1000);
     }
 }

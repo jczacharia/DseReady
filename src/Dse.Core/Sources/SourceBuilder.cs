@@ -53,6 +53,8 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
     public OptionsBuilder<TOptions> AddOptions<TOptions>() where TOptions : class =>
         Services.AddOptions<TOptions>().BindConfiguration(SourceKey).ValidateDataAnnotations().ValidateOnStart();
 
+    public OptionsBuilder<BufferOptions> ConfigureBufferOptions() => Services.AddOptions<BufferOptions>(SourceKey);
+
     public void AddIngestion<TIngest>() where TIngest : class, IIngest<TDoc>
     {
         Services.AddScoped<IIngest<TDoc>, TIngest>();
@@ -60,5 +62,7 @@ public sealed class SourceBuilder<TDoc> where TDoc : class
     }
 
     public void AddHealthCheck<TCheck>(HealthStatus status = HealthStatus.Degraded) where TCheck : class, IHealthCheck =>
-        Services.AddHealthChecks().AddCheck<TCheck>(SourceKey, status, ["source", SourceKey], TimeSpan.FromSeconds(8));
+        Services
+            .AddHealthChecks()
+            .AddCheck<TCheck>(SourceKey, status, ["source", SourceKey], HealthCheckDefaults.ReadinessTimeout);
 }

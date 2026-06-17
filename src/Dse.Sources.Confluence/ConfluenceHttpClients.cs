@@ -32,17 +32,19 @@ internal static class ConfluenceHttpClients
             .AddHttpClient(BackfillClient, ConfigureClient)
             .ConfigurePrimaryHttpMessageHandler(sp =>
                 CreatePrimaryHandler(sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value))
-            .AddResilienceHandler("confluence-backfill", static pipeline =>
+            .AddResilienceHandler("confluence-backfill", static (pipeline, context) =>
             {
-                pipeline.AddTimeout(TimeSpan.FromMinutes(2));
+                ConfluenceOptions opts = context.ServiceProvider.GetRequiredService<IOptions<ConfluenceOptions>>().Value;
+
+                pipeline.AddTimeout(opts.BackfillTotalTimeout);
 
                 pipeline.AddRetry(new HttpRetryStrategyOptions
                 {
-                    MaxRetryAttempts = 5,
+                    MaxRetryAttempts = opts.BackfillMaxRetryAttempts,
                     BackoffType = DelayBackoffType.Exponential,
                     UseJitter = true,
-                    Delay = TimeSpan.FromSeconds(2),
-                    MaxDelay = TimeSpan.FromMinutes(2),
+                    Delay = opts.BackfillRetryDelay,
+                    MaxDelay = opts.BackfillRetryMaxDelay,
                     ShouldHandle = static args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or TimeoutRejectedException
                         || args.Outcome.Result is
@@ -73,7 +75,7 @@ internal static class ConfluenceHttpClients
                     },
                 });
 
-                pipeline.AddTimeout(TimeSpan.FromSeconds(30));
+                pipeline.AddTimeout(opts.BackfillAttemptTimeout);
             });
 
         services
@@ -82,7 +84,9 @@ internal static class ConfluenceHttpClients
                 CreatePrimaryHandler(sp.GetRequiredService<IOptions<ConfluenceOptions>>().Value))
             // Interactive reads: one tight overall budget, no retries — fail fast for the browser/UI. A timeout
             // surfaces as TimeoutRejectedException, which the endpoints map to 504.
-            .AddResilienceHandler("confluence-readthrough", static pipeline => pipeline.AddTimeout(TimeSpan.FromSeconds(20)));
+            .AddResilienceHandler("confluence-readthrough", static (pipeline, context) =>
+                pipeline.AddTimeout(
+                    context.ServiceProvider.GetRequiredService<IOptions<ConfluenceOptions>>().Value.ReadThroughTimeout));
     }
 
     private static void ConfigureClient(IServiceProvider sp, HttpClient http)
@@ -102,11 +106,12 @@ internal static class ConfluenceHttpClients
         WebProxy? proxy = opts.Proxy is { } p && Uri.IsWellFormedUriString(p, UriKind.Absolute) ? new WebProxy(p) : null;
         return new SocketsHttpHandler
         {
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            PooledConnectionLifetime = opts.PooledConnectionLifetime,
+            PooledConnectionIdleTimeout = opts.PooledConnectionIdleTimeout,
+            MaxConnectionsPerServer = opts.MaxConnectionsPerServer ?? opts.CrawlConcurrency,
             UseCookies = false,
             AutomaticDecompression = DecompressionMethods.All,
-            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ConnectTimeout = opts.ConnectTimeout,
             UseProxy = proxy is not null,
             Proxy = proxy,
         };
