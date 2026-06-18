@@ -1,18 +1,17 @@
 // Copyright (c) PNC Financial Services. All rights reserved.
 //
-// Confluence ingest bottleneck probe — PER-SPACE, bounded-offset crawl.
+// Confluence ingest bottleneck probe — PER-SPACE chain crawl via the space content endpoint (no CQL).
 //
 // Why this shape:
-//   * Global offset paging is capped server-side (can't crawl a 445k corpus) — but PER SPACE the offsets
-//     stay tiny, so offset paging is safe again AND gives random-access parallelism (unlike cursors,
-//     which are sequential and collapse a skewed corpus to one straggler chain).
-//   * Count each space, then flatten every (space, pageStart) into ONE work list crawled at full concurrency,
-//     so a mega-space's pages parallelize like everyone else's — no straggler tail.
-//   * `order by created asc` — created is immutable, so offset paging is stable (no skip/dup mid-crawl).
-//   * The space is known per partition -> injected for FREE -> `expand=space` dropped.
+//   * CQL search is the slow path (Lucene + per-hit re-hydration) AND it capped pages at 50 — so we avoid it
+//     entirely, including for counting (that pre-count pass was the 5x slowdown).
+//   * Crawl /rest/api/space/{key}/content/{page|blogpost} (direct space list, limit ≤ 100), following _links.next.
+//     Each (space, type) is one sequential chain; many chains run concurrently, bounded by CrawlConcurrency.
+//   * No count phase -> no offset partitioning -> we just follow next until it's gone.
+//   * Go through the F5 VIP: requests are stateless, and least-connections routes more work to FASTER nodes.
+//   * Space is known per chain -> injected for FREE -> expand is just body.storage + version.
 //
-// Stages measured: Confluence server(TTFB) vs wire-transfer vs client-CPU, ES write back-pressure.
-// No Polly (raw latency), no post-configure layer.
+// Caveat: a chain is sequential, so a mega-space is a straggler (watch `chain wall max`). Measure first.
 //
 // Run:  dotnet run --project src/Dse.Probes -c Release
 
@@ -34,29 +33,21 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 // ───────────────────────────── TUNING — sweep these ─────────────────────────────
-// Read is server-bound (~0.5s/doc body.storage on the SEARCH endpoint). The content endpoint may be cheaper
-// per doc AND allows far larger pages — the probe A/Bs both. Fewer, heavier requests => lower concurrency.
-const bool UseContentEndpoint = true; // true = /rest/api/content (limit up to 1000); false = /rest/api/content/search (CQL, limit≤50)
-const int CrawlConcurrency = 16;     // concurrent page fetches across all spaces — SWEEP 8/16/24
-const int PageSize = 250;            // results per page — up to 1000 on the content endpoint; ≤50 on search/CQL
-const long MaxDocs = 10_000;         // steady-state validation run; set 0 for the real full crawl
-const int MaxSpaces = 0;             // 0 = all spaces (realistic partitioning)
+const int CrawlConcurrency = 16;     // concurrent (space,type) chains == concurrent requests — SWEEP 8/16/24
+const int PageSize = 100;            // results per page — the space content endpoint caps at 100
+const long MaxDocs = 0;              // global cap for fast iteration; 0 = whole corpus
+const int MaxSpaces = 50;            // cap spaces for fast iteration; 0 = all
 const string SpaceType = "global";   // "global" (enterprise spaces) or "" for all incl. personal (~user)
-string[] ContentTypes = ["page", "blogpost"]; // content endpoint takes ONE type per call -> partition per type
+string[] ContentTypes = ["page", "blogpost"]; // one chain per (space, type)
 
 // body.storage is the only thing indexed; version drives the change-detection hash. Space comes free (per-space crawl).
 string[] Expand = ["body.storage", "version"];
 
-// Empty => crawl through the F5 VIP (confluence.BaseAddress). Non-empty => round-robin pages across nodes.
-// Offset requests are stateless, so the VIP's least-connections is fine; nodes are only for raw distribution tests.
-// string[] ConfluenceNodes = ["http://lcfl328a:8090","http://lcfl329a:8090","http://lcfl330a:8090","http://lcfl331a:8090"];
-string[] ConfluenceNodes = [];
-
-// ES is NOT the bottleneck (read is). These are sized for a ~48/s feed with headroom, not stress.
+// ES is NOT the bottleneck (read is). These are sized for the read feed with headroom, not stress.
 const string ProbeIndex = "confluence-probe"; // throwaway target index; no alias promoted, safe to delete afterwards
 const long ExportMaxBytes = 10L * 1024 * 1024; // byte budget per bulk — binds first (~770 docs/bulk at 13 KiB/doc)
 const int ExportMaxItems = 2_000;    // item ceiling per bulk (bytes bind before this)
-const int ExportConcurrency = 8;     // concurrent bulk requests — ample for a ~48/s producer
+const int ExportConcurrency = 8;     // concurrent bulk requests
 const int InboundBufferMaxSize = 2_000; // in-flight doc queue before back-pressure (~26 MiB ceiling)
 // ─────────────────────────────────────────────────────────────────────────────────
 
@@ -102,7 +93,6 @@ meter.CreateObservableCounter("confluence.write.errors", () => m.WriteErrors);
 
 log.LogInformation("Consts: {@Consts}", new
 {
-    Endpoint = UseContentEndpoint ? "content" : "search",
     CrawlConcurrency,
     PageSize,
     MaxDocs,
@@ -110,7 +100,6 @@ log.LogInformation("Consts: {@Consts}", new
     SpaceType,
     ContentTypes,
     Expand,
-    Nodes = ConfluenceNodes.Length == 0 ? "VIP" : string.Join(separator: ',', ConfluenceNodes),
     ProbeIndex,
     ExportMaxItems,
     ExportMaxBytes,
@@ -118,7 +107,8 @@ log.LogInformation("Consts: {@Consts}", new
     InboundBufferMaxSize,
 });
 
-// ── Confluence client(s): explicit, no resilience pipeline so latency is raw. One handler, one client per target. ──
+// ── Confluence client: explicit, no resilience pipeline so latency is raw. Through the F5 VIP so least-connections
+//    routes more to faster nodes; MaxConnectionsPerServer caps concurrency at the socket layer. ──
 using var handler = new SocketsHttpHandler
 {
     MaxConnectionsPerServer = CrawlConcurrency,
@@ -127,33 +117,21 @@ using var handler = new SocketsHttpHandler
     ConnectTimeout = TimeSpan.FromSeconds(10),
 };
 
-string? basicAuth = confluence is { Username.Length: > 0, Password.Length: > 0 }
-    ? Convert.ToBase64String(Encoding.UTF8.GetBytes($"{confluence.Username}:{confluence.Password}"))
-    : null;
-
-HttpClient CreateClient(string baseUrl)
+using var http = new HttpClient(handler) { BaseAddress = new Uri(confluence.BaseAddress), Timeout = Timeout.InfiniteTimeSpan };
+http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+if (confluence is { Username.Length: > 0, Password.Length: > 0 })
 {
-    var c = new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri(baseUrl), Timeout = Timeout.InfiniteTimeSpan };
-    c.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-    if (basicAuth is not null)
-    {
-        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basicAuth);
-    }
-
-    return c;
+    string basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{confluence.Username}:{confluence.Password}"));
+    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", basic);
 }
-
-HttpClient vip = CreateClient(confluence.BaseAddress);
-HttpClient[] nodeClients = ConfluenceNodes.Length == 0 ? [vip] : [.. ConfluenceNodes.Select(CreateClient)];
-HttpClient ClientFor(string spaceKey) => nodeClients[(spaceKey.GetHashCode() & 0x7FFFFFFF) % nodeClients.Length];
 
 string expand = Uri.EscapeDataString(string.Join(separator: ',', Expand));
 
-// Fetch one search page; split server(TTFB) vs transfer vs parse.
-async Task<SearchPage> FetchSearchAsync(HttpClient client, string url, Action<long, long, long, int>? record, CancellationToken token)
+// Fetch one content page; split server(TTFB) vs transfer vs parse. Returns docs + the next link (or null).
+async Task<SearchPage> FetchAsync(string url, Action<long, long, long, int>? record, CancellationToken token)
 {
     var sw = Stopwatch.StartNew();
-    using HttpResponseMessage resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+    using HttpResponseMessage resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
     long ttfbTicks = sw.ElapsedTicks;
     resp.EnsureSuccessStatusCode();
 
@@ -173,7 +151,7 @@ async Task<SearchPage> FetchSearchAsync(HttpClient client, string url, Action<lo
 static string Relativize(string next) =>
     next.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? new Uri(next).PathAndQuery : next;
 
-// ── Enumerate spaces (cheap; paged via _links.next) ──
+// ── Enumerate spaces (cheap; paged via _links.next; NOT CQL) ──
 async Task<List<SpaceRef>> EnumerateSpacesAsync()
 {
     var spaces = new List<SpaceRef>();
@@ -181,7 +159,7 @@ async Task<List<SpaceRef>> EnumerateSpacesAsync()
     string? url = $"/rest/api/space?limit=100{typeFilter}";
     while (url is not null)
     {
-        using HttpResponseMessage resp = await vip.GetAsync(url, ct);
+        using HttpResponseMessage resp = await http.GetAsync(url, ct);
         resp.EnsureSuccessStatusCode();
         byte[] bytes = await resp.Content.ReadAsByteArrayAsync(ct);
         SpaceListPage page = JsonSerializer.Deserialize<SpaceListPage>(bytes, ConfluenceDocJsonConverter.JsonSerializerOptions)
@@ -204,29 +182,10 @@ if (spaces.Count == 0)
     return;
 }
 
-var parallelOpts = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = CrawlConcurrency };
-
-// ── Count each (space, type) via the cheap SEARCH endpoint (limit=0, no expand -> no body rendering),
-//    so we can build bounded offset partitions even when fetching from the content endpoint. ──
-var counts = new ConcurrentBag<(SpaceRef Space, string Type, long Count)>();
-await Parallel.ForEachAsync(
-    spaces.SelectMany(s => ContentTypes.Select(t => (Space: s, Type: t))),
-    parallelOpts,
-    async (st, token) =>
-    {
-        string url = $"/rest/api/content/search?cql={Uri.EscapeDataString($"space=\"{st.Space.Key}\" and type={st.Type}")}&limit=0";
-        SearchPage page = await FetchSearchAsync(ClientFor(st.Space.Key), url, record: null, token);
-        counts.Add((st.Space, st.Type, page.TotalSize));
-    });
-
-// Flatten every (space, type, pageStart) into one work list — bounded offsets, fully parallelizable, no straggler.
-List<(SpaceRef Space, string Type, long Start)> partitions = [.. counts
-    .SelectMany(c => PageStarts(c.Count).Select(start => (c.Space, c.Type, Start: start)))];
-long corpus = counts.Sum(c => c.Count);
-
-log.LogInformation("Corpus ~{Total} docs across {SpaceCount} spaces ({Type}); {Partitions} page-partitions of {Page} via {Endpoint} at concurrency {Crawl}",
-    corpus, spaces.Count, string.IsNullOrEmpty(SpaceType) ? "all" : SpaceType, partitions.Count, PageSize,
-    UseContentEndpoint ? "content" : "search", CrawlConcurrency);
+// One chain per (space, type) — no count phase; just follow _links.next.
+List<(SpaceRef Space, string Type)> chains = [.. spaces.SelectMany(s => ContentTypes.Select(t => (Space: s, Type: t)))];
+log.LogInformation("Crawling {Chains} (space,type) chains across {Spaces} spaces via space content endpoint, limit {Page}, concurrency {Crawl}",
+    chains.Count, spaces.Count, PageSize, CrawlConcurrency);
 
 // ── Elasticsearch write path: real IngestChannel, explicit BufferOptions. Ingestion is always ON —
 //    we write for real, but never promote an alias, so the throwaway index is simply deleted after. ──
@@ -282,8 +241,8 @@ Task reporter = Task.Run(async () =>
     while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
     {
         long read = Interlocked.Read(ref m.DocsRead), written = Interlocked.Read(ref m.DocsWritten);
-        log.LogInformation("  read {Read,7}/s ({ReadTot} total) | write {Write,7}/s ({WriteTot} total)",
-            read - lastRead, read, written - lastWritten, written);
+        log.LogInformation("  read {Read,7}/s ({ReadTot} total) | write {Write,7}/s ({WriteTot} total) | chains {Done}/{Total}",
+            read - lastRead, read, written - lastWritten, written, Interlocked.Read(ref m.ChainsDone), chains.Count);
         lastRead = read;
         lastWritten = written;
     }
@@ -293,65 +252,66 @@ bool CapReached() => MaxDocs > 0 && Interlocked.Read(ref m.DocsRead) >= MaxDocs;
 
 try
 {
-    await Parallel.ForEachAsync(partitions, parallelOpts, async (part, token) =>
-    {
-        if (CapReached())
+    await Parallel.ForEachAsync(chains,
+        new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = CrawlConcurrency },
+        async (chain, token) =>
         {
-            return;
-        }
+            var chainSw = Stopwatch.StartNew();
+            string? url = $"/rest/api/space/{Uri.EscapeDataString(chain.Space.Key)}/content/{chain.Type}?limit={PageSize}&expand={expand}";
 
-        // Back-pressure gate FIRST — block here if ES is behind rather than fetch a page into memory.
-        var gate = Stopwatch.StartNew();
-        if (!await channel.WaitToWriteAsync(token).ConfigureAwait(false))
-        {
-            return;
-        }
-
-        long blockedTicks = gate.ElapsedTicks;
-
-        // Content endpoint: direct space list, large pages, default (id) order. Search: CQL, ≤50, stable created order.
-        string url = UseContentEndpoint
-            ? $"/rest/api/content?spaceKey={Uri.EscapeDataString(part.Space.Key)}&type={part.Type}&start={part.Start}&limit={PageSize}&expand={expand}"
-            : $"/rest/api/content/search?cql={Uri.EscapeDataString($"space=\"{part.Space.Key}\" and type={part.Type} order by created asc")}&start={part.Start}&limit={PageSize}&expand={expand}";
-        HttpClient client = ClientFor(part.Space.Key);
-
-        SearchPage page;
-        try
-        {
-            page = await FetchSearchAsync(client, url, (ttfb, body, parse, bytes) =>
+            while (url is not null && !CapReached())
             {
-                Interlocked.Add(ref m.TtfbTicks, ttfb);
-                Interlocked.Add(ref m.BodyTicks, body);
-                Interlocked.Add(ref m.ParseTicks, parse);
-                Interlocked.Add(ref m.BytesRead, bytes);
-                Interlocked.Increment(ref m.Pages);
-                m.TtfbMs.Add(Stopwatch.GetElapsedTime(startingTimestamp: 0, ttfb).TotalMilliseconds);
-            }, token);
-        }
-        catch (HttpRequestException ex)
-        {
-            Interlocked.Increment(ref m.FetchErrors);
-            log.LogWarning("Fetch failed in space {Space} ({Type}) @ {Start}: {Status} {Message}",
-                part.Space.Key, part.Type, part.Start, ex.StatusCode, ex.Message);
-            return;
-        }
+                // Back-pressure gate FIRST — block here if ES is behind rather than fetch a page into memory.
+                var gate = Stopwatch.StartNew();
+                if (!await channel.WaitToWriteAsync(token).ConfigureAwait(false))
+                {
+                    return;
+                }
 
-        Interlocked.Add(ref m.DocsRead, page.Results.Count);
+                long blockedTicks = gate.ElapsedTicks;
 
-        foreach (ConfluenceDoc doc in page.Results)
-        {
-            doc.Space = new ConfluenceDoc.SpaceRecord // space for free, from the listing
-            {
-                Id = part.Space.Id, Key = part.Space.Key, Name = part.Space.Name, Link = null,
-            };
+                SearchPage page;
+                try
+                {
+                    page = await FetchAsync(url, (ttfb, body, parse, bytes) =>
+                    {
+                        Interlocked.Add(ref m.TtfbTicks, ttfb);
+                        Interlocked.Add(ref m.BodyTicks, body);
+                        Interlocked.Add(ref m.ParseTicks, parse);
+                        Interlocked.Add(ref m.BytesRead, bytes);
+                        Interlocked.Increment(ref m.Pages);
+                        m.TtfbMs.Add(Stopwatch.GetElapsedTime(startingTimestamp: 0, ttfb).TotalMilliseconds);
+                    }, token);
+                }
+                catch (HttpRequestException ex)
+                {
+                    Interlocked.Increment(ref m.FetchErrors);
+                    log.LogWarning("Fetch failed in space {Space} ({Type}): {Status} {Message}",
+                        chain.Space.Key, chain.Type, ex.StatusCode, ex.Message);
+                    return;
+                }
 
-            var write = Stopwatch.StartNew();
-            await channel.WriteAsync(doc, token).ConfigureAwait(false);
-            blockedTicks += write.ElapsedTicks;
-        }
+                Interlocked.Add(ref m.DocsRead, page.Results.Count);
 
-        Interlocked.Add(ref m.WriteBlockedTicks, blockedTicks);
-    });
+                foreach (ConfluenceDoc doc in page.Results)
+                {
+                    doc.Space = new ConfluenceDoc.SpaceRecord // space for free, from the listing
+                    {
+                        Id = chain.Space.Id, Key = chain.Space.Key, Name = chain.Space.Name, Link = null,
+                    };
+
+                    var write = Stopwatch.StartNew();
+                    await channel.WriteAsync(doc, token).ConfigureAwait(false);
+                    blockedTicks += write.ElapsedTicks;
+                }
+
+                Interlocked.Add(ref m.WriteBlockedTicks, blockedTicks);
+                url = page.Links?.Next is { } n ? Relativize(n) : null;
+            }
+
+            Interlocked.Increment(ref m.ChainsDone);
+            m.ChainMs.Add(chainSw.Elapsed.TotalMilliseconds);
+        });
 
     log.LogInformation("Draining channel to Elasticsearch...");
     await channel.WaitForDrainAsync(TimeSpan.FromMinutes(10), ct);
@@ -369,6 +329,7 @@ double readPerSec = m.DocsRead / wallSec;
 double avgServerMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.TtfbTicks).TotalMilliseconds / m.Pages;
 double avgTransferMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.BodyTicks).TotalMilliseconds / m.Pages;
 double avgParseMs = m.Pages == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.ParseTicks).TotalMilliseconds / m.Pages;
+double perDocMs = m.DocsRead == 0 ? 0 : Stopwatch.GetElapsedTime(startingTimestamp: 0, m.TtfbTicks).TotalMilliseconds / m.DocsRead;
 double bytesPerDoc = m.DocsRead == 0 ? 0 : (double)m.BytesRead / m.DocsRead;
 
 var proc = Process.GetCurrentProcess();
@@ -383,8 +344,11 @@ Console.WriteLine(
 Console.WriteLine($"  pages            : {m.Pages}  (fetch errors {m.FetchErrors})");
 Console.WriteLine(
     $"  per page         : server(TTFB) avg {avgServerMs:F0}ms | transfer avg {avgTransferMs:F0}ms | parse avg {avgParseMs:F1}ms");
+Console.WriteLine($"  per doc (server) : {perDocMs:F1}ms  ← compare to CQL's ~500ms/doc");
 Console.WriteLine(
-    $"  server(TTFB) dist: p50 {Percentile(m.TtfbMs, p: 0.50):F0}ms  p95 {Percentile(m.TtfbMs, p: 0.95):F0}ms  p99 {Percentile(m.TtfbMs, p: 0.99):F0}ms  max {Percentile(m.TtfbMs, p: 1.0):F0}ms");
+    $"  server(TTFB) dist: p50 {Percentile(m.TtfbMs, p: 0.50):F0}ms  p95 {Percentile(m.TtfbMs, p: 0.95):F0}ms  max {Percentile(m.TtfbMs, p: 1.0):F0}ms");
+Console.WriteLine(
+    $"  chain wall       : p50 {Percentile(m.ChainMs, p: 0.50) / 1000:F1}s  p95 {Percentile(m.ChainMs, p: 0.95) / 1000:F1}s  max {Percentile(m.ChainMs, p: 1.0) / 1000:F1}s  (straggler skew)");
 Console.WriteLine(
     $"  peak memory      : {proc.PeakWorkingSet64 / 1024 / 1024} MiB working set | {GC.GetTotalAllocatedBytes() / 1024 / 1024} MiB allocated total");
 
@@ -398,7 +362,7 @@ Console.WriteLine(blockSec / wallSec > 0.25
 double readMs = avgServerMs + avgTransferMs;
 Console.WriteLine(readMs > avgParseMs * 3
     ? avgServerMs > avgTransferMs * 3
-        ? "  READ: Confluence SERVER time (TTFB) dominates — it's compute, not transfer. The Expand set is the prime lever."
+        ? "  READ: Confluence SERVER time (TTFB) dominates — body.storage rendering. Lower per-doc here vs CQL = the win."
         : "  READ: BODY TRANSFER dominates — response size/bandwidth bound."
     : "  READ: parse/CPU time is significant — client CPU (JSON + HTML clean) is a real factor.");
 if (m.FetchErrors > 0)
@@ -406,17 +370,15 @@ if (m.FetchErrors > 0)
     Console.WriteLine($"  NOTE: {m.FetchErrors} fetch error(s) — Confluence saturation/rate-limit at this concurrency. Back off CrawlConcurrency.");
 }
 
+double maxChainS = Percentile(m.ChainMs, p: 1.0) / 1000;
+if (maxChainS > wallSec * 0.5 && m.ChainsDone > 1)
+{
+    Console.WriteLine($"  NOTE: one chain took {maxChainS:F0}s of {wallSec:F0}s — STRAGGLER (a mega-space's sequential chain). Would need sub-partitioning to parallelize.");
+}
+
 Console.WriteLine("────────────────────────────────────────────────");
 
 return;
-
-static IEnumerable<long> PageStarts(long count)
-{
-    for (long start = 0; start < count; start += PageSize)
-    {
-        yield return start;
-    }
-}
 
 static double Percentile(ConcurrentBag<double> samples, double p)
 {
@@ -433,10 +395,12 @@ static double Percentile(ConcurrentBag<double> samples, double p)
 
 internal sealed class Metrics
 {
+    public readonly ConcurrentBag<double> ChainMs = [];
     public readonly ConcurrentBag<double> TtfbMs = [];
     public long BodyTicks; // body transfer + decompression
     public long BulkCount;
     public long BytesRead;
+    public long ChainsDone;
     public long DocsRead;
     public long DocsWritten;
     public long FetchErrors; // non-2xx / transport failures (saturation / rate-limit signal)
@@ -449,7 +413,6 @@ internal sealed class Metrics
 
 internal sealed record SearchPage(
     [property: JsonPropertyName("results")] IReadOnlyList<ConfluenceDoc> Results,
-    [property: JsonPropertyName("totalSize")] long TotalSize,
     [property: JsonPropertyName("_links")] Links? Links);
 
 internal sealed record SpaceListPage(
