@@ -32,11 +32,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 // ───────────────────────────── TUNING — sweep these ─────────────────────────────
-const int CrawlConcurrency = 16;     // concurrent page fetches (worker pool size) — SWEEP 8/16/24
+const int CrawlConcurrency = 32;     // concurrent page fetches — the #1 throughput lever. SWEEP 24/32/48 to find Confluence's knee
+                                     // (Dse4's 400/s ran the crawl ~cluster-write-pool-wide, not 16). Watch fetch errors/TTFB.
 const int PageSize = 100;            // results per page — the space content endpoint caps at 100
 const int FanThresholdPages = 3;     // after this many sequential pages, CQL-count the space and fan offsets out
-const long MaxDocs = 0;              // global cap for fast iteration; 0 = whole corpus
-const int MaxSpaces = 50;            // cap spaces for fast iteration; 0 = all
+const long MaxDocs = 50_000;         // big enough to engage fan-out on a real mega-space; 0 = whole corpus
+const int MaxSpaces = 0;             // 0 = all spaces — needed so the real mega-space is in play
 const string SpaceType = "global";   // "global" (enterprise spaces) or "" for all incl. personal (~user)
 string[] ContentTypes = ["page", "blogpost"]; // one seed chain per (space, type)
 
@@ -48,7 +49,8 @@ const string ProbeIndex = "confluence-probe"; // throwaway target index; no alia
 const long ExportMaxBytes = 10L * 1024 * 1024; // byte budget per bulk — binds first (~770 docs/bulk at 13 KiB/doc)
 const int ExportMaxItems = 2_000;    // item ceiling per bulk (bytes bind before this)
 const int ExportConcurrency = 8;     // concurrent bulk requests
-const int InboundBufferMaxSize = 2_000; // in-flight doc queue before back-pressure (~26 MiB ceiling)
+const int InboundBufferMaxSize = 3_500; // large in-flight queue (Dse4's value) — lets readers burst ahead of ES
+const double OutboundBufferMaxLifetimeSeconds = 1; // flush partial bulks every 1s (Dse4) — keeps the pipe moving
 // ─────────────────────────────────────────────────────────────────────────────────
 
 var configManager = new ConfigurationManager();
@@ -211,6 +213,7 @@ using var channel = new IngestChannel<ConfluenceDoc>(new IngestChannelOptions<Co
     {
         OutboundBufferMaxSize = ExportMaxItems,
         OutboundBufferMaxBytes = ExportMaxBytes,
+        OutboundBufferMaxLifetime = TimeSpan.FromSeconds(OutboundBufferMaxLifetimeSeconds),
         InboundBufferMaxSize = InboundBufferMaxSize,
         ExportMaxConcurrency = ExportConcurrency,
     },
